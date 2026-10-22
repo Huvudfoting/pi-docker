@@ -26,4 +26,7 @@ export PI_WORKSPACE="$workspace"
 export PI_UID="$(id -u)"
 export PI_GID="$(id -g)"
 export OLLAMA_NETWORK="${OLLAMA_NETWORK:-pi-ollama}"
-exec docker compose -f "$root/pi/compose.yaml" run --rm --build pi "$@"
+
+exec docker compose -f "$root/pi/compose.yaml" run --rm --build pi \
+  --extension /usr/local/lib/node_modules/pi-rewind-hook/index.ts \
+  "$@"
