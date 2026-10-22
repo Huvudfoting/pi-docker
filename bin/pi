@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+workspace="$PWD"
+name=""
+if [[ $# -gt 0 && "$1" != -* ]]; then workspace="$1"; shift; fi
+while (($#)); do
+  case "$1" in
+    --name) [[ $# -ge 2 ]] || { echo "--name needs a value" >&2; exit 2; }; name="$2"; shift 2 ;;
+    --) shift; break ;;
+    *) break ;;
+  esac
+done
+workspace="$(realpath -e -- "$workspace")"
+[[ -d "$workspace" ]] || { echo "Not a directory: $workspace" >&2; exit 2; }
+[[ -n "$name" ]] || name="$(basename "$workspace")"
+[[ "$name" =~ ^[a-zA-Z0-9_.-]+$ ]] || { echo "Invalid instance name" >&2; exit 2; }
+# Unique path-derived hash prevents same-name projects from sharing session data.
+hash="$(printf '%s' "$workspace" | sha256sum | cut -c1-12)"
+session="$root/pi/sessions/${name}-${hash}"
+mkdir -p "$session" "$root/pi/config"
+export PI_CONFIG="$root/pi/config"
+export PI_SESSIONS="$session"
+export PI_WORKSPACE="$workspace"
+export PI_UID="$(id -u)"
+export PI_GID="$(id -g)"
+export OLLAMA_NETWORK="${OLLAMA_NETWORK:-pi-ollama}"
+exec docker compose -f "$root/pi/compose.yaml" run --rm --build pi "$@"

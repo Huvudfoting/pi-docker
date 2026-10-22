@@ -1,0 +1,27 @@
+services:
+  pi:
+    image: pi-agent:latest
+    build: .
+    init: true
+    stdin_open: true
+    tty: true
+    user: "${PI_UID:-1000}:${PI_GID:-1000}"
+    environment:
+      HOME: /home/nano
+      PI_CODING_AGENT_DIR: /pi/agent
+      PI_CODING_AGENT_SESSION_DIR: /pi/sessions
+    volumes:
+      - ${PI_CONFIG:?}:/pi/agent
+      - ${PI_SESSIONS:?}:/pi/sessions
+      - ${PI_WORKSPACE:?}:/workspace
+    working_dir: /workspace
+    networks:
+      - ollama
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+networks:
+  ollama:
+    external: true
+    name: ${OLLAMA_NETWORK:-pi-ollama}

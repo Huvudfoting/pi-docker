@@ -1,0 +1,6 @@
+.env
+ollama/.env
+pi/.env
+
+pi/config/*
+pi/sessions/*
