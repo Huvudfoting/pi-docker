@@ -1,11 +1,12 @@
 ## Using Pi with Docker
 
 Pi runs inside isolated Docker containers, allowing you to work on multiple projects simultaneously without installing Pi directly on your host.
+Extensions are built into the image, loaded by the launcher and avvailable in all instances.
 
 Each Pi instance has:
 - **Its own workspace** — the project directory Pi can access and modify.
 - **Its own session storage** — conversations and their history are kept separate.
-- **Shared configuration** — all instances use the same models, settings, skills, and cloud model authentication.
+- **Shared configuration** — all instances use the same models, settings, skills, cloud model authentication and .gitconfig
 - **Access to Ollama** — local models run through the shared Ollama container.
 
 Containers are temporary. Your projects, configuration, and sessions persist on the host.

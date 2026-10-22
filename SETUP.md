@@ -31,7 +31,7 @@ chmod +x bin/pi bin/pi-login
 ```
 
 In the **pi** folder.
-Run the pi-login script to authenticate to remote models.
+Run the pi-login script build image and authenticate to remote models.
 
 ```bash
 ./bin/pi-login
@@ -89,6 +89,18 @@ Inside Pi, use `/model` to choose Ollama or an OAuth-enabled OpenAI model.
 - Ollama's network name can be overridden with `OLLAMA_NETWORK` for **both** stacks.
 - The Ollama `models.json` is a starting example. Adjust context length, model IDs, and provider API settings for your installed Pi version.
 
+### Extensions and tools
+
+Pi and its extensions are installed globally in `pi/Dockerfile` during image build.
+Extensions are loaded through the `--extension` argument in `bin/pi`.
+To add or update extensions, modify the Dockerfile and rebuild
+
+### Git configuration
+
+The host's `~/.gitconfig` is mounted read-only at `/home/node/.gitconfig`.
+The container uses `HOME=/home/node`, allowing Git to reuse the host's username, email, and other global settings.
+No separate Git identity configuration is required inside the container.
+
 ## Important caveats
 
 - Shared `auth.json` is a concurrency-sensitive credential store. Concurrent OAuth refresh writes may race; keep a backup and re-login if needed. Never commit or publish it.
@@ -108,9 +120,9 @@ docker compose -f ollama/compose.yaml --env-file ollama/.env logs -f ollama
 docker compose -f pi/compose.yaml config
 ```
 
-## Rebuilding the Pi Docker image
+## Rebuilding the image
 
-Use no-cache to force a Pi update.
+Use no-cache to force a Pi update if you make changes.
 Currently the version is pi@latest.
 You may want to pin this for a stable environment.
 
