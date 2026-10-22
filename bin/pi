@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+script="$(realpath -- "${BASH_SOURCE[0]}")"
+root="$(dirname -- "$(dirname -- "$script")")"
 workspace="$PWD"
 name=""
 if [[ $# -gt 0 && "$1" != -* ]]; then workspace="$1"; shift; fi

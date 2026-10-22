@@ -64,9 +64,16 @@ pi # Should now execute the pi container
 
 Examples of ways to start your pi container
 
+
 ```bash
 pi ~/repos/project-a
+```
+
+```bash
 pi ~/repos/project-b --name worker2
+```
+
+```bash
 pi ~/repos/project-a --name second
 ```
 
