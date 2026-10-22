@@ -1,136 +1,139 @@
+## Using Pi with Docker
 
-# Pi Docker + Ollama
+Pi runs inside isolated Docker containers, allowing you to work on multiple projects simultaneously without installing Pi directly on your host.
 
-Running isolated Pi instances against both remote and local mmodels.
+Each Pi instance has:
+- **Its own workspace** — the project directory Pi can access and modify.
+- **Its own session storage** — conversations and their history are kept separate.
+- **Shared configuration** — all instances use the same models, settings, skills, and cloud model authentication.
+- **Access to Ollama** — local models run through the shared Ollama container.
 
-Two independent Compose projects share one explicitly named Docker network (`pi-ollama`).
-The Ollama project **creates** the network. The Pi project **joins** it as an external network.
-Both are kept separate so restarting Pi never restarts the GPU inference server.
+Containers are temporary. Your projects, configuration, and sessions persist on the host.
 
-## Requirements
-- Docker Engine + Compose plugin.
-- NVIDIA Container Toolkit.
+> **New to pi-docker?** See [SETUP.md](SETUP.md) for instructions on installing and configuring pi-docker, including Docker, authentication, and Ollama integration.
+>
+> This guide covers everyday usage: starting Pi, managing workspaces and sessions, running multiple instances, and switching models.
 
-## 1. Start Ollama
 
-In the **ollama** directory After setting .env variables in the compose file (model store mount point etc.).
+### Starting Pi
 
-```bash
-docker compose up -d
-```
-
-The container is named `ollama`, and other containers on the shared network resolve `http://ollama:11434`.
-Only localhost port 11434 is published on the host, so ollama is reachable in for example a browser on the host.
-
-## 2. Build Pi image and run the authentication flow
-
-First ensure scripts are executable.
+Open a terminal in any project directory and run:
 
 ```bash
-chmod +x bin/pi bin/pi-login
+cd ~/repos/my-project
+pi
 ```
 
-In the **pi** folder.
-Run the pi-login script to authenticate to remote models.
+Pi starts in a new Docker container with the current directory mounted as `/workspace`.
+
+You can also specify a workspace explicitly:
 
 ```bash
-./bin/pi-login
+pi ~/repos/my-project
 ```
 
-Example for ChatGPT Plus (OAuth, no api key):
-Inside Pi use `/login`, choose OpenAI/ChatGPT OAuth and finish the browser flow manually by 
-cutting and pasting the browser callback url into pi with shift + ctrl + v.
+Both commands start Pi with access to the same project files.
 
-The login is persisted in `pi/config/auth.json` and shared with Pi instances.
+### Working with sessions
 
-## 3. Create a symlink for the executable
+By default, Pi uses the workspace directory name to identify its session storage.
+
+For example:
 
 ```bash
-mkdir -p ~/.local/bin
-ln -s "$(pwd)/bin/pi" ~/.local/bin/pi
+pi ~/repos/project-a
+pi ~/repos/project-b
 ```
 
-Verify the symlink:
+Each project gets independent session storage, so conversations from one project won't interfere with another.
 
-```bash
-ls -l ~/.local/bin/pi
-```
+**Sessions are persistent.** Exiting Pi removes its Docker container but does not delete its conversation history.
 
-```bash
-pi # Should now execute the pi container
-```
+Running the same command again gives Pi access to the same session storage. 
+Use Pi's built-in session commands to resume previous conversations.
 
-### Examples 
+### Running multiple Pi instances
 
-Examples of ways to start your pi container
+You can run several Pi instances simultaneously, each in its own terminal.
 
+For example:
 
+**Terminal 1:**
 ```bash
 pi ~/repos/project-a
 ```
 
+**Terminal 2:**
 ```bash
-pi ~/repos/project-b --name worker2
+pi ~/repos/project-b
 ```
 
-```bash
-pi ~/repos/project-a --name second
-```
+Each instance runs in a separate Docker container with its own workspace and sessions.
 
-You can also run `pi` from the current directory.
-Arguments after `--name NAME` or `--` are forwarded to Pi.
-Inside Pi, use `/model` to choose Ollama or an OAuth-enabled OpenAI model.
+Both share the same model configuration and authentication, so you can use ChatGPT or Ollama independently in either instance.
 
-## Configuration
+### Named sessions
 
-- `pi/config` is shared across containers, including OAuth tokens, models and skills.
-- `pi/sessions` is private per named workspace. Reusing the same workspace/name resumes the same session directory; choose different names for concurrent sessions.
-- `/workspace` is the only host project mount.
-- Ollama's network name can be overridden with `OLLAMA_NETWORK` for **both** stacks.
-- The Ollama `models.json` is a starting example. Adjust context length, model IDs, and provider API settings for your installed Pi version.
-
-## Important caveats
-
-- Shared `auth.json` is a concurrency-sensitive credential store. Concurrent OAuth refresh writes may race; keep a backup and re-login if needed. Never commit or publish it.
-- Sharing the agent directory also shares mutable settings/extensions. Avoid concurrent edits to global config.
-- The launcher isolates containers and sessions, **not simultaneous edits to the same checkout**. Use Git worktrees for concurrent writing agents.
-- This is filesystem/process isolation, not a hardened sandbox: the agent can modify the mounted workspace and reach services on its Docker network.
-- Herdr process spawning from inside containers has **not** been validated. Herdr may need a different integration path; this project deliberately avoids claiming working Herdr orchestration.
-- Pi/Ollama API compatibility and ChatGPT OAuth availability depend on upstream releases and account terms. Test both providers after building.
-- The Pi npm package is installed at build time. Pin an exact version in `pi/Dockerfile` once tested.
-
-## Diagnostics
+Use `--name` to create separate session storage for different tasks within the same project:
 
 ```bash
-docker network inspect pi-ollama
-docker compose -f ollama/compose.yaml --env-file ollama/.env ps
-docker compose -f ollama/compose.yaml --env-file ollama/.env logs -f ollama
-docker compose -f pi/compose.yaml config
+pi ~/repos/my-project --name backend
+pi ~/repos/my-project --name frontend
 ```
 
-## Rebuilding the Pi Docker image
+This creates two independent Pi environments:
 
-Use no-cache to force a Pi update.
-Currently the version is pi@latest.
-You may want to pin this for a stable environment.
+| Instance | Workspace | Session storage |
+|---|---|---|
+| backend | my-project | backend |
+| frontend | my-project | frontend |
 
-```bash
-docker build --no-cache -t pi-agent:latest ./pi
+The `--name` option selects the launcher's session directory. It does not rename a conversation inside Pi.
+
+You can restart either instance later using the same command.
+
+**Important:** Named instances still share the same project files. If both agents modify the same files simultaneously, 
+their changes may conflict. Use separate Git worktrees when running multiple agents that write to the same repository.
+
+### Switching models
+
+Inside Pi, use:
+
+```text
+/model
 ```
 
-### Check Pi version
+Select any configured model, including:
 
-To check Pi versioon inside container.
+- Local Ollama models.
+- ChatGPT models available through your authenticated subscription.
 
-```bash
-docker run --rm pi-agent:latest --version
+All Pi instances share the same model configuration, but each can select and use models independently.
+
+Local inference is handled by the existing Ollama container. Starting additional Pi containers does not start additional Ollama servers.
+
+### Exiting Pi
+
+Exit Pi normally using:
+
+```text
+/exit
 ```
 
-## Removal
+The Pi container is automatically removed.
 
-```bash
-docker compose -f ollama/compose.yaml --env-file ollama/.env down
-# Stop Pi containers first; then the shared network can be removed by Compose.
-# Delete this project directory to remove local Pi config/sessions.
-```
-Existing model files live outside the project and are not deleted by `down`.
+Your workspace files, configuration, authentication, and session history remain intact.
+
+### Quick reference
+
+| Command | Description |
+|---|---|
+| `pi` | Start Pi in the current directory |
+| `pi ~/repos/project-a` | Start Pi in a specific workspace |
+| `pi --name backend` | Use a named session directory in the current workspace |
+| `pi ~/repos/project-a --name frontend` | Use a named session directory in a specific workspace |
+| `/model` | Switch between available AI models |
+| `/exit` | Exit Pi and remove its temporary container |
+
+**In short:** Navigate to a project, type `pi`, and start working. Use `--name` when you want independent sessions 
+for different tasks, and separate workspaces or Git worktrees when you want multiple agents working concurrently.
