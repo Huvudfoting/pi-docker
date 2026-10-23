@@ -28,9 +28,8 @@ data/                    # Private local state; ignored by Git; never mount as s
   ollama.env
 ```
 
-Only put files safe for every Pi workspace under `setup/`. Read-only does not
-mean confidential: every agent can read that directory at `/opt/pi-docker`.
-The existing `/pi/agent` mount still gives Pi access to its authentication.
+Keep `setup/` non-secret. See [mounts and persistence](setup/SETUP.md#directory-layout-and-persistence)
+and [security](setup/SETUP.md#security-and-concurrency) for access boundaries.
 
 Run host commands in the linked guides from this repository root unless stated
 otherwise.

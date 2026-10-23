@@ -97,8 +97,7 @@ pi -- --version
 ```
 
 The launcher resolves symlinks to find this repository, independently of the
-current workspace. See [README.md](README.md) for everyday usage and
-[CUSTOMIZATION.md](CUSTOMIZATION.md) for subsequent configuration or maintenance.
+current workspace.
 
 ## Security and concurrency
 

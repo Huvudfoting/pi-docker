@@ -4,6 +4,16 @@
 container commands.** See [SETUP.md](SETUP.md) for installation and
 [README.md](README.md) for everyday usage.
 
+## Container runtimes
+
+The image includes Node.js 24, the latest stable Python 3 (`python` and
+`python3` are the same interpreter), pip, and uv/uvx.
+
+Prefer uv for Python package management: `uv sync` for uv projects, or
+`uv venv` then `uv pip install <package>` for a project-local `.venv`.
+Do not install packages globally. `UV_PYTHON_DOWNLOADS=never` disables uv's
+automatic Python downloads; use the image-provided interpreter.
+
 ## Extension architecture decision
 
 - **All downloaded/third-party extensions:** install `package@latest` with npm in
@@ -14,9 +24,6 @@ container commands.** See [SETUP.md](SETUP.md) for installation and
 - **Homemade extensions:** keep code in extension folders. Repository-owned tools
   go in `setup/extensions/`, mounted read-only at `/opt/pi-docker/extensions/`
   and loaded by both launchers. Personal/project folders are listed below.
-
-This separates upstream dependencies updated by image rebuilds from code we own
-and edit through mounts. Change this policy only by explicit user decision.
 
 | Image npm dependency (`@latest`) | Launcher load path |
 |---|---|
@@ -65,8 +72,9 @@ Shared resources affect all instances; project resources require Pi project trus
 | Project skills | `<project>/.pi/skills/` | `/workspace/.pi/skills/` |
 
 Extension folders accept `.ts`/`.js` files or subdirectories with `index.ts` or
-`index.js`. Skills are subdirectories containing `SKILL.md`. Shared configuration
-and project mounts are writable; `/opt/pi-docker` is read-only.
+`index.js`. Skills are subdirectories containing `SKILL.md`.
+
+## Applying changes
 
 | Change | Action |
 |---|---|
@@ -76,28 +84,23 @@ and project mounts are writable; `/opt/pi-docker` is read-only.
 | Launcher or Compose | Start new containers |
 | Dockerfile, Pi, downloaded extensions, global npm or OS packages | Rebuild image, then start new containers |
 
-Changed files are immediately visible through mounts, but loaded extension code
-still needs `/reload`. Avoid concurrent edits to shared configuration.
-
 ## Updating image-managed packages
 
-`@latest` is a moving registry tag, not a version pin or lockfile. It resolves
-only when npm runs during a build; cached builds and existing containers do not
-refresh packages. This policy prefers current releases over reproducible builds.
+The Python/uv image tags and npm `@latest` track current releases rather than
+pinning versions. Pull fresh images and bypass build caches to update them:
 
 ```bash
 docker build --pull --no-cache -t pi-agent:latest ./setup/pi
 docker run --rm pi-agent:latest --version
 ```
 
-Exit old sessions and launch new containers with `pi` or `setup/bin/pi-login`.
-Review upstream changes and smoke-test the loaded extensions and local/cloud
-models after rebuilding. Inside a container, `npm list -g --depth=0` shows actual
-versions. Do not update global packages in-container; Docker/socket are unavailable.
-
-Direct `docker run` does not supply the launchers' mounts, appended instructions,
-or extension arguments. Mounted deployment source may be newer than the image.
-For credential and concurrency boundaries, see [security](SETUP.md#security-and-concurrency).
+After rebuilding, launch with `pi` or `setup/bin/pi-login` and smoke-test the
+extensions and models. Inside a container, check versions with `node --version`,
+`python --version`, `uv --version`, and `npm list -g --depth=0`.
+Docker is unavailable inside the container; do not update global packages there.
+Direct `docker run` is only an image smoke test, not a configured launcher session.
+See [mounts](SETUP.md#directory-layout-and-persistence) and
+[security](SETUP.md#security-and-concurrency) for those boundaries.
 
 ## Upstream documentation
 

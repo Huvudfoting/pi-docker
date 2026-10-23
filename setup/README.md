@@ -33,9 +33,8 @@ Multiple terminals can run separate containers. Each has its own session storage
 selection, but all share `data/config/` for settings, models, resources, and
 authentication, plus the host's read-only `.gitconfig`.
 
-**Session names and containers do not isolate edits to the same project.** Use
-separate Git worktrees for concurrent writing agents. Shared configuration edits
-also affect other instances.
+Use separate Git worktrees for concurrent writing agents. See
+[security and concurrency](SETUP.md#security-and-concurrency) for shared-state risks.
 
 ## Inside Pi
 
@@ -43,7 +42,5 @@ also affect other instances.
 - `/exit`: exit Pi and remove its temporary container, retaining host data.
 - `/reload`: reload changed settings and mounted resources in that session.
 
-Deployment guides and source are readable at `/opt/pi-docker` in every launched
-container. See [maintenance](CUSTOMIZATION.md) for the downloaded-versus-homemade
-extension policy and image updates, or [security](SETUP.md#security-and-concurrency)
-for mount and credential boundaries.
+Deployment guides and source are readable at `/opt/pi-docker` inside the container.
+For reload/rebuild rules, see [applying changes](CUSTOMIZATION.md#applying-changes).
