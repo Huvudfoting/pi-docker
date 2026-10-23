@@ -1,0 +1,7 @@
+{
+  "name": "pi-docker-homemade-extensions",
+  "private": true,
+  "pi": {
+    "extensions": ["*.ts", "*.js", "*/index.ts", "*/index.js"]
+  }
+}
