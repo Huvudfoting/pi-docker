@@ -1,6 +1,5 @@
+# Credentials, mutable configuration, sessions, and local environment files.
+/data/
 .env
-ollama/.env
-pi/.env
-
-pi/config/*
-pi/sessions/*
+.env.*
+!.env.example

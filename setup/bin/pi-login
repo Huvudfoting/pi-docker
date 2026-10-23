@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+script="$(realpath -- "${BASH_SOURCE[0]}")"
+setup="$(dirname -- "$(dirname -- "$script")")"
+root="$(dirname -- "$setup")"
+mkdir -p "$root/data/config" "$root/data/sessions/login"
+export PI_CONFIG="$root/data/config"
+export PI_SESSIONS="$root/data/sessions/login"
+# Login needs no access to the repository's private data through /workspace.
+export PI_WORKSPACE="$setup"
+export PI_UID="$(id -u)"
+export PI_GID="$(id -g)"
+export OLLAMA_NETWORK="${OLLAMA_NETWORK:-pi-ollama}"
+exec docker compose -f "$setup/pi/compose.yaml" run --rm --build pi \
+  --append-system-prompt /opt/pi-docker/AGENTS.md \
+  --extension /usr/local/lib/node_modules/pi-rewind-hook/index.ts \
+  "$@"

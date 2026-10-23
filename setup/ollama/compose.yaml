@@ -1,3 +1,6 @@
+# From the repository root:
+# docker compose --env-file data/ollama.env -f setup/ollama/compose.yaml up -d
+# Keep real environment values outside the read-only setup mount.
 services:
   ollama:
     image: ${OLLAMA_IMAGE:-ollama/ollama:latest}
@@ -12,7 +15,11 @@ services:
     ports:
       - "127.0.0.1:11434:11434"
     volumes:
-      - ${OLLAMA_MODELS:?}:/models:rw
+      - type: bind
+        source: ${OLLAMA_MODELS:?Set an absolute model-store path in data/ollama.env}
+        target: /models
+        bind:
+          create_host_path: false
     deploy:
       resources:
         reservations:

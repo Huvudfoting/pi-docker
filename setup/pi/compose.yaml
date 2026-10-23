@@ -17,6 +17,13 @@ services:
       - ${PI_SESSIONS:?}:/pi/sessions
       - ${PI_WORKSPACE:?}:/workspace
       - ${HOME}/.gitconfig:/home/node/.gitconfig:ro
+      # Only safe deployment source lives here; private state is in ../../data/.
+      - type: bind
+        source: ../
+        target: /opt/pi-docker
+        read_only: true
+        bind:
+          create_host_path: false
     working_dir: /workspace
     networks:
       - ollama
