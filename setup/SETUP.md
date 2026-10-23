@@ -7,6 +7,17 @@ Restarting Pi does not restart the GPU inference server.
 **All commands below run on the host from the repository root unless stated otherwise.**
 The repository root is the directory containing `setup/` and `data/`.
 
+## Quick reference
+
+| Task | Guide |
+|---|---|
+| First-time installation and authentication | This guide |
+| Shared/project resource paths, packages, reload/restart/rebuild rules | [CUSTOMIZATION.md](CUSTOMIZATION.md#quick-reference) |
+| Everyday launcher, workspace, and session usage | [README.md](README.md) |
+
+Read only the guide relevant to your task. Resource-location and lifecycle tables
+are maintained in CUSTOMIZATION.md rather than duplicated here.
+
 ## Requirements
 
 - Docker Engine and the Compose plugin.
@@ -77,7 +88,8 @@ Authentication persists in `data/config/auth.json`, shared across instances.
 Never commit or publish that file.
 
 Configure compatible endpoints and local model IDs in `data/config/models.json`.
-Use the installed Pi documentation for the schema supported by your version.
+Use the installed Pi documentation for the schema supported by your version;
+see [upstream documentation paths](CUSTOMIZATION.md#upstream-documentation).
 Inside Pi, `/model` selects an available model.
 
 ## 3. Install the host launcher symlink
@@ -95,99 +107,8 @@ pi -- --version
 ```
 
 The launcher resolves symlinks to find this repository, independently of the
-current workspace. See [README.md](README.md) for everyday usage.
-
-## Configuration and customization
-
-`PI_CODING_AGENT_DIR=/pi/agent` overrides upstream Pi's usual `~/.pi/agent`
-location. Settings there are shared across instances. Project configuration
-lives under `/workspace/.pi` and is subject to Pi's project-trust handling.
-
-### Shared extensions, skills, and packages
-
-User-managed resources do not require rebuilding the image:
-
-| Resource | Host location | Container location |
-|---|---|---|
-| Settings | `data/config/settings.json` | `/pi/agent/settings.json` |
-| Extension | `data/config/extensions/example.ts` | `/pi/agent/extensions/example.ts` |
-| Skill | `data/config/skills/example/SKILL.md` | `/pi/agent/skills/example/SKILL.md` |
-| Global instructions | `data/config/AGENTS.md` | `/pi/agent/AGENTS.md` |
-
-A skill is a directory containing `SKILL.md` with `name` and `description`
-frontmatter. Extensions are executable TypeScript or JavaScript modules.
-Review third-party code and supporting scripts before installing.
-
-Install a Pi package from the host through the wrapper:
-
-```bash
-pi -- install npm:<package-name>@<version>
-pi -- list
-pi -- remove npm:<package-name>@<version>
-```
-
-Inside a container shell, use `pi install ...`, `pi list`, or `pi remove ...`
-directly. Host `pi install ...` without `--` treats `install` as a workspace path.
-Package declarations and managed installations use the persistent agent directory.
-Avoid simultaneous package or configuration changes from multiple instances.
-
-### Project-local resources
-
-Use `.pi/extensions/`, `.pi/skills/<name>/SKILL.md`, and `.pi/settings.json`
-in the project. These persist with that project, rather than with the image.
-To declare a project-local package from the host:
-
-```bash
-pi -- install --local npm:<package-name>@<version>
-```
-
-Grant project trust only after reviewing unfamiliar resources. Run `/reload`
-in an active Pi session after manually changing settings or resources. Other
-running instances need their own reload to pick up shared changes.
-
-### Image-managed components
-
-Pi and `pi-rewind-hook` are installed globally in `setup/pi/Dockerfile`.
-Both launchers explicitly load the rewind extension using `--extension`.
-A global npm install alone does not make an arbitrary extension load.
-
-Change the Dockerfile for Pi updates, image-managed extensions, or OS packages,
-and change both launchers if a new extension needs an explicit load argument.
-Rebuild on the host and start new containers; existing containers keep their
-original image. Do not update the root-owned global installation from Pi tools.
-
-```bash
-docker build --no-cache -t pi-agent:latest ./setup/pi
-docker run --rm pi-agent:latest --version
-```
-
-The Dockerfile currently uses `@latest`. Pin tested package versions for
-reproducibility. A regular cached rebuild may not refresh those packages;
-`--no-cache` forces the install step to run again.
-
-### What needs a restart?
-
-| Change | Action |
-|---|---|
-| User/project settings, extensions, or skills | `/reload` in each affected active session |
-| Documentation under `setup/` | Immediately readable through the bind mount |
-| Appended `setup/AGENTS.md` instructions | Start a new Pi process to ensure fresh prompt text |
-| Launcher or Compose changes | Start a new container |
-| Dockerfile, Pi version, global npm or OS packages | Rebuild image, then start a new container |
-
-### Upstream documentation
-
-Inside the image, version-matched Pi documentation and extension examples are at:
-
-```text
-/usr/local/lib/node_modules/@earendil-works/pi-coding-agent/docs/
-/usr/local/lib/node_modules/@earendil-works/pi-coding-agent/examples/extensions/
-```
-
-Start with `configuration.md`, `settings.md`, `extensions.md`, `skills.md`, and
-`packages.md`. Use `npm list -g --depth=0` inside the container to inspect actual
-installed versions. Session model metadata is exposed through `PI_MODEL`,
-`PI_PROVIDER`, and `PI_REASONING_LEVEL` in agent shell-tool commands.
+current workspace. See [README.md](README.md) for everyday usage and
+[CUSTOMIZATION.md](CUSTOMIZATION.md) for subsequent configuration or maintenance.
 
 ## Security and concurrency
 

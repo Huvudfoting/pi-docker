@@ -13,9 +13,11 @@ Each Pi instance has:
 
 Containers are temporary. Your projects, configuration, and sessions persist on the host.
 
-> **New to pi-docker?** See [SETUP.md](SETUP.md) for instructions on installing and configuring pi-docker, including Docker, authentication, and Ollama integration.
+> **New to pi-docker?** See [SETUP.md](SETUP.md) for initial installation, authentication, and Ollama integration.
 >
-> This guide covers everyday usage: starting Pi, managing workspaces and sessions, running multiple instances, and switching models.
+> **Customizing or maintaining Pi?** See [CUSTOMIZATION.md](CUSTOMIZATION.md) for resource paths, packages, and reload/rebuild rules.
+>
+> This guide covers everyday launcher usage. Read only the guide relevant to your task.
 
 
 ### Starting Pi
@@ -130,21 +132,12 @@ Your workspace files, configuration, authentication, and session history remain 
 
 ### Managing packages and setup
 
-On the host, `pi` is the Docker wrapper, not the upstream CLI. Use `--` to
-forward package subcommands without treating them as workspace paths:
+See [CUSTOMIZATION.md](CUSTOMIZATION.md) for shared/project resource locations,
+package commands, and reload/restart/rebuild rules. Detailed maintenance commands
+are maintained there rather than duplicated in this usage guide.
 
-```bash
-pi -- install npm:<package-name>@<version>
-pi -- install --local npm:<package-name>@<version>
-pi -- list
-```
-
-Inside the container's shell, use `pi install ...` or `pi list` directly.
-Use `/reload` in an active session after changing resources. Shared installs
-affect all instances; `--local` writes project configuration.
-
-See [SETUP.md](SETUP.md) for installation locations, persistence,
-rebuilding the image, and the security limits of the read-only setup mount.
+For mount access and credential considerations, see
+[security and concurrency](SETUP.md#security-and-concurrency).
 
 ### Quick reference
 
