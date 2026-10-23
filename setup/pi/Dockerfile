@@ -16,7 +16,8 @@ RUN apt-get update \
 RUN npm install -g \
     @earendil-works/pi-coding-agent@latest \
     pi-rewind-hook@latest \
-    pi-web-access@latest
+    pi-web-access@latest \
+    @juicesharp/rpiv-ask-user-question@latest
 
 RUN mkdir -p /pi/agent /pi/sessions /workspace \
 	&& chown -R node:node /pi /workspace

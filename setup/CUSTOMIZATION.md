@@ -23,6 +23,7 @@ and edit through mounts. Change this policy only by explicit user decision.
 | `@earendil-works/pi-coding-agent` | Image entrypoint `pi` |
 | `pi-rewind-hook` | `/usr/local/lib/node_modules/pi-rewind-hook/index.ts` |
 | `pi-web-access` | `/usr/local/lib/node_modules/pi-web-access` (Pi package manifest) |
+| `@juicesharp/rpiv-ask-user-question` | `/usr/local/lib/node_modules/@juicesharp/rpiv-ask-user-question` (Pi package manifest) |
 
 ### Web access
 
@@ -38,6 +39,14 @@ only features you need; upstream supports `tools.<name>.enabled` and
 `commands.<name>.enabled` in `/pi/agent/web-search.json`. Review the installed
 `/usr/local/lib/node_modules/pi-web-access/README.md` for configuration keys and
 `SECURITY.md` in the same directory for boundaries. Do not put credentials in Git.
+
+### Structured clarification
+
+`@juicesharp/rpiv-ask-user-question` adds the `ask_user_question` tool for
+interactive clarification dialogs. It makes no model calls of its own and needs
+no API key; it can be used with local models. Non-interactive runs do not expose
+the tool. After rebuilding and starting a new container, ask the agent to use
+`ask_user_question` for a consequential choice to smoke-test the dialog.
 
 ## Quick reference
 
