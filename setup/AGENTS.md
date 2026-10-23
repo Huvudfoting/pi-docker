@@ -1,22 +1,26 @@
 # Pi Docker
 
-Disposable container; persistent mounts:
-- `/workspace`: writable host project.
-- `/pi/agent`: shared writable config, resources, and credentials.
-- `/pi/sessions`: launcher-selected sessions.
-- `/opt/pi-docker`: read-only current deployment source, possibly newer than image.
+Disposable container; host-persistent mounts:
+- `/workspace`: writable selected project.
+- `/pi/agent`: shared writable configuration, resources, and credentials.
+- `/pi/sessions`: launcher-selected session storage.
+- `/opt/pi-docker`: read-only deployment source; may be newer than the image.
 
-Read only the guide relevant to the task (not every linked document):
-- Initial installation/authentication: `/opt/pi-docker/SETUP.md`.
-- Resources, packages, reload/rebuild rules: `/opt/pi-docker/CUSTOMIZATION.md`.
-- Launcher/workspace usage: `/opt/pi-docker/README.md`.
-Use these paths directly; do not search `/workspace` for deployment docs.
+Read only the relevant mounted guide; do not search `/workspace` for these docs:
+- Installation/authentication: `/opt/pi-docker/SETUP.md`.
+- Resource paths, extension policy, maintenance: `/opt/pi-docker/CUSTOMIZATION.md`.
+- Launcher and session usage: `/opt/pi-docker/README.md`.
 
-Shared extensions/skills: `/pi/agent/{extensions,skills}`; project: `/workspace/.pi/{extensions,skills}`.
-Resource/settings changes: `/reload` per affected session; no rebuild.
-Image/global-package/OS changes: rebuild on host, then create new containers.
-Docker/socket are unavailable here; do not update global Pi in-container.
-Host wrapper: `pi -- install ...`; container CLI: `pi install ...`.
+Deployment policy:
+- Downloaded extensions: npm `@latest` in `setup/pi/Dockerfile`, baked into the
+  image and explicitly loaded by both launchers. No vendoring or runtime installs.
+- Homemade extensions: `/opt/pi-docker/extensions/`, `/pi/agent/extensions/`, or
+  `/workspace/.pi/extensions/`. Shared/project skills use sibling `skills/` folders.
+- Settings and mounted resources: `/reload` per affected session; no rebuild.
+- Image/npm/OS updates: host no-cache rebuild, then new containers. Docker/socket
+  are unavailable here; do not update global Pi or packages in-container.
+- Launcher/Compose changes need new containers; appended instructions need a new Pi process.
+
 Shared edits affect other instances; avoid concurrent configuration changes.
 Do not inspect or disclose credentials or real environment files during routine setup.
-Credential mounts are not a security boundary against tools or extensions.
+Mounts and instructions do not isolate credentials from tools or extensions.

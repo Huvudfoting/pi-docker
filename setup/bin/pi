@@ -31,4 +31,6 @@ export OLLAMA_NETWORK="${OLLAMA_NETWORK:-pi-ollama}"
 exec docker compose -f "$setup/pi/compose.yaml" run --rm pi \
   --append-system-prompt /opt/pi-docker/AGENTS.md \
   --extension /usr/local/lib/node_modules/pi-rewind-hook/index.ts \
+  --extension /usr/local/lib/node_modules/pi-web-access \
+  --extension /opt/pi-docker/extensions \
   "$@"

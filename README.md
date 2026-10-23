@@ -3,7 +3,8 @@
 Run Pi in disposable Docker containers with persistent configuration and sessions.
 
 - [Everyday usage](setup/README.md)
-- [Installation, configuration, and maintenance](setup/SETUP.md)
+- [Installation and authentication](setup/SETUP.md)
+- [Extensions, configuration, and maintenance](setup/CUSTOMIZATION.md)
 - [Agent setup-discovery instructions](setup/AGENTS.md)
 
 ## Repository layout
@@ -12,7 +13,9 @@ Run Pi in disposable Docker containers with persistent configuration and session
 setup/                   # Non-secret deployment source; mounted read-only in Pi
   README.md
   SETUP.md
+  CUSTOMIZATION.md
   AGENTS.md
+  extensions/            # Homemade extensions only; downloaded ones are image npm packages
   bin/pi
   bin/pi-login
   pi/Dockerfile

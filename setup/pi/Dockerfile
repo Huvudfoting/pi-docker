@@ -11,18 +11,17 @@ RUN apt-get update \
         nano \
     && rm -rf /var/lib/apt/lists/*
 
-# Install image-managed Pi and extensions. Deployment source is bind-mounted
-# read-only at runtime, not copied into the image. Keep private state outside
-# this build context (setup/pi).
+# Downloaded extensions: npm @latest in the image; homemade code: mounted folders.
+# Deployment source is mounted read-only; keep private state outside setup/pi.
 RUN npm install -g \
     @earendil-works/pi-coding-agent@latest \
-    pi-rewind-hook@latest
+    pi-rewind-hook@latest \
+    pi-web-access@latest
 
 RUN mkdir -p /pi/agent /pi/sessions /workspace \
 	&& chown -R node:node /pi /workspace
 USER node
 WORKDIR /workspace
 ENV PI_CODING_AGENT_DIR=/pi/agent \
-    PI_CODING_AGENT_SESSION_DIR=/pi/sessions \
-    PI_DOCKER_SETUP_DIR=/opt/pi-docker
+    PI_CODING_AGENT_SESSION_DIR=/pi/sessions
 ENTRYPOINT ["pi"]

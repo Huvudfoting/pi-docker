@@ -7,16 +7,8 @@ Restarting Pi does not restart the GPU inference server.
 **All commands below run on the host from the repository root unless stated otherwise.**
 The repository root is the directory containing `setup/` and `data/`.
 
-## Quick reference
-
-| Task | Guide |
-|---|---|
-| First-time installation and authentication | This guide |
-| Shared/project resource paths, packages, reload/restart/rebuild rules | [CUSTOMIZATION.md](CUSTOMIZATION.md#quick-reference) |
-| Everyday launcher, workspace, and session usage | [README.md](README.md) |
-
-Read only the guide relevant to your task. Resource-location and lifecycle tables
-are maintained in CUSTOMIZATION.md rather than duplicated here.
+For everyday commands see [README.md](README.md); for extension policy, resource
+paths, and reload/rebuild rules see [CUSTOMIZATION.md](CUSTOMIZATION.md).
 
 ## Requirements
 
@@ -38,9 +30,8 @@ are maintained in CUSTOMIZATION.md rather than duplicated here.
 
 `data/` is ignored by Git. Keep credentials, sessions, and real environment files
 there, never under `setup/`. The Pi image build context is only `setup/pi/`.
-The additional setup mount is one directory bind mount; it adds no image size.
-It exposes current host source, which may differ from the source used to build
-the running image. Missing mount sources fail rather than being created silently.
+The setup mount exposes current host source, which may be newer than the image.
+Missing deployment mount sources fail rather than being created silently.
 
 Both launchers append `/opt/pi-docker/AGENTS.md` to the system prompt, making
 these guides discoverable even when `/workspace` is a different repository.
@@ -79,8 +70,7 @@ chmod +x setup/bin/pi setup/bin/pi-login
 ```
 
 This builds the image and starts Pi with `setup/` as its workspace, shared
-configuration, login session storage, setup instructions, and the rewind
-extension. Both launchers forward remaining CLI arguments to Pi.
+configuration, login session storage, and the standard instructions and extensions.
 
 Inside Pi, run `/login`, choose your provider, and complete its browser flow.
 For a manual OAuth callback, paste the callback URL into Pi when prompted.
@@ -112,17 +102,17 @@ current workspace. See [README.md](README.md) for everyday usage and
 
 ## Security and concurrency
 
-- Read-only prevents modification through `/opt/pi-docker`; it does not hide its
-  contents. Do not put private files in `setup/`, even if Git ignores them.
-- This mount does not restrict the existing `/pi/agent` credential access.
-  Pi, extensions, and agent shell tools run as the same user and can generally
-  read `auth.json`. Instructions not to disclose credentials are not isolation.
+- Pi, extensions, and shell tools share permissions and can read mounted
+  credentials, including `auth.json`. Review third-party code; npm installation
+  and instructions not to disclose secrets are not security boundaries.
+- Read-only prevents modification through `/opt/pi-docker`, not disclosure.
+  Do not put private files in `setup/`, even if Git ignores them.
 - Choosing the repository root as `/workspace` exposes `data/` through that
   writable project mount. For setup-only inspection, choose `setup/` instead.
 - The host's `.gitconfig` is readable, including any sensitive values stored in
   it. Host-only include paths or credential helpers may not work in the container.
 - Shared OAuth refresh writes can race. Keep a secure backup and re-login if
-  necessary. Shared settings and packages are also mutable global state.
+  necessary. Avoid concurrent changes to shared configuration.
 - Containers and session directories do not isolate simultaneous edits to the
   same checkout. Use separate Git worktrees for concurrent writing agents.
 - This is process/filesystem isolation, not a hardened sandbox. Agents can modify
