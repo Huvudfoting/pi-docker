@@ -4,7 +4,8 @@ Run Pi in disposable containers with persistent projects, configuration, and
 sessions. Local inference uses the shared Ollama service; starting Pi does not
 start another model server.
 
-- [Initial installation and authentication](SETUP.md)
+- [Initial installation](SETUP.md)
+- [OpenAI/provider login and GitHub authentication](AUTHENTICATION.md)
 - [Extensions, resource paths, and maintenance](CUSTOMIZATION.md)
 
 ## Launching
@@ -38,10 +39,21 @@ to resume a conversation. `--name` selects storage, not a conversation title.
 
 Multiple terminals can run separate containers. Each has its own session storage
 selection, but all share `data/config/` for settings, models, resources, and
-authentication, plus the host's read-only `.gitconfig`.
+authentication, plus the host's read-only `.gitconfig` and read-only
+`data/gh-config/` GitHub CLI configuration.
 
 Use separate Git worktrees for concurrent writing agents. See
 [security and concurrency](SETUP.md#security-and-concurrency) for shared-state risks.
+
+## GitHub CLI
+
+`gh` is available through Pi's shell tool for issues, PRs, and GitHub API queries.
+Optional private repository authentication uses a read-only mount of
+`data/gh-config/`; see [GitHub authentication](AUTHENTICATION.md#github-cli-optional).
+For example, ask Pi to run `gh issue list`, `gh issue view 123`, or `gh pr checks`.
+Agree on confirmation rules before allowing remote changes such as posting
+comments, closing issues, or merging PRs. Installing `gh` does not automatically
+configure Git pushes.
 
 ## Inside Pi
 

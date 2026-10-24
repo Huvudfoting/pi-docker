@@ -15,6 +15,7 @@ RUN groupadd --gid 1000 node \
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         git \
+        gh \
         curl \
         ca-certificates \
         libstdc++6 \
@@ -24,7 +25,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Fail the build if either runtime or essential Python modules are unavailable.
-RUN node --version \
+RUN gh --version \
+    && node --version \
     && npm --version \
     && python --version \
     && python3 -c "import bz2, ctypes, lzma, sqlite3, ssl, venv" \

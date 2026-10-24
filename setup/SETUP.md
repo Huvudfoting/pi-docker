@@ -9,6 +9,8 @@ The repository root is the directory containing `setup/` and `data/`.
 
 For everyday commands see [README.md](README.md); for extension policy, resource
 paths, and reload/rebuild rules see [CUSTOMIZATION.md](CUSTOMIZATION.md).
+For OpenAI/provider login and GitHub credentials, see
+[AUTHENTICATION.md](AUTHENTICATION.md).
 
 ## Requirements
 
@@ -23,6 +25,7 @@ paths, and reload/rebuild rules see [CUSTOMIZATION.md](CUSTOMIZATION.md).
 |---|---|---|
 | `setup/` | `/opt/pi-docker` | Read-only, non-secret deployment source and guides |
 | `data/config/` | `/pi/agent` | Shared writable settings, models, credentials, and resources |
+| `data/gh-config/` | `/run/gh-config` (read-only) | Optional GitHub CLI credentials, shared across instances |
 | `data/sessions/<name>-<path-hash>/` | `/pi/sessions` | Writable session storage selected by the launcher |
 | Selected project | `/workspace` | Writable project files |
 | `~/.gitconfig` | `/home/node/.gitconfig` | Read-only Git settings |
@@ -58,7 +61,7 @@ If you change `OLLAMA_NETWORK` in `data/ollama.env`, also export that same value
 in the host shell before using `pi`. The launcher does not source the Ollama
 environment file.
 
-## 2. Build Pi and authenticate
+## 2. Build Pi
 
 Build the Pi image before running the launcher:
 
@@ -68,22 +71,8 @@ docker build -t pi-agent:latest ./setup/pi
 ```
 
 The launcher checks for this image and prints the build command if it is missing.
-For initial authentication, launch Pi with the repository directory as the
-workspace.
-
-```pi
-cd <repo-dir> && ./setup/bin/pi
-```
-
-Inside Pi, run `/login`, choose your provider, and complete its browser flow.
-For a manual OAuth callback, paste the callback URL into Pi when prompted.
-Authentication persists in `data/config/auth.json`, shared across instances.
-Never commit or publish that file.
-
-Configure compatible endpoints and local model IDs in `data/config/models.json`.
-Use the installed Pi documentation for the schema supported by your version;
-see [upstream documentation paths](CUSTOMIZATION.md#upstream-documentation).
-Inside Pi, `/model` selects an available model.
+After building, follow [AUTHENTICATION.md](AUTHENTICATION.md) for OpenAI/provider
+login, model configuration, and optional GitHub CLI credentials.
 
 ## 3. Install the host launcher symlink
 
@@ -113,8 +102,8 @@ current workspace.
   writable project mount. For setup-only inspection, choose `setup/` instead.
 - The host's `.gitconfig` is readable, including any sensitive values stored in
   it. Host-only include paths or credential helpers may not work in the container.
-- Shared OAuth refresh writes can race. Keep a secure backup and re-login if
-  necessary. Avoid concurrent changes to shared configuration.
+- For credential persistence, OAuth refresh concurrency, and token rotation, see
+  [AUTHENTICATION.md](AUTHENTICATION.md).
 - Containers and session directories do not isolate simultaneous edits to the
   same checkout. Use separate Git worktrees for concurrent writing agents.
 - This is process/filesystem isolation, not a hardened sandbox. Agents can modify
@@ -138,6 +127,7 @@ by the launcher:
 
 ```bash
 PI_CONFIG="$PWD/data/config" \
+GH_CONFIG="$PWD/data/gh-config" \
 PI_SESSIONS="$PWD/data/sessions/login" \
 PI_WORKSPACE="$PWD/setup" \
 PI_UID="$(id -u)" PI_GID="$(id -g)" \

@@ -2,7 +2,8 @@
 
 **Commands run on the host from the deployment repository root unless marked as
 container commands.** See [SETUP.md](SETUP.md) for installation and
-[README.md](README.md) for everyday usage.
+[README.md](README.md) for everyday usage. OpenAI/provider login and GitHub
+credentials are documented in [AUTHENTICATION.md](AUTHENTICATION.md).
 
 ## Container runtimes
 
@@ -27,8 +28,8 @@ automatic Python downloads; use the image-provided interpreter.
 
 ### Subscription usage extension
 
-`@specode/pi-subscription-usage` requires an **Openai Codex (Legacy)** provider
-in addition to the usual OpenAI token in order to authorize API access.
+See [authentication requirements](AUTHENTICATION.md#subscription-usage-extension)
+for the additional provider login needed by `@specode/pi-subscription-usage`.
 
 ## Quick reference
 

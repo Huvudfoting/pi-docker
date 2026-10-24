@@ -12,11 +12,18 @@ services:
       VISUAL: nano
       PI_CODING_AGENT_DIR: /pi/agent
       PI_CODING_AGENT_SESSION_DIR: /pi/sessions
+      GH_CONFIG_DIR: /run/gh-config
     volumes:
       - ${PI_CONFIG:?}:/pi/agent
       - ${PI_SESSIONS:?}:/pi/sessions
       - ${PI_WORKSPACE:?}:/workspace
       - ${HOME}/.gitconfig:/home/node/.gitconfig:ro
+      - type: bind
+        source: ${GH_CONFIG:?}
+        target: /run/gh-config
+        read_only: true
+        bind:
+          create_host_path: false
       # Only safe deployment source lives here; private state is in ../../data/.
       - type: bind
         source: ../

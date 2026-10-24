@@ -26,6 +26,9 @@ workspace="$(realpath -e -- "$workspace")"
 hash="$(printf '%s' "$workspace" | sha256sum | cut -c1-12)"
 session="$root/data/sessions/${name}-${hash}"
 mkdir -p "$session" "$root/data/config"
+# An empty directory permits unauthenticated use; never generate credentials here.
+(umask 077; mkdir -p "$root/data/gh-config")
+export GH_CONFIG="$root/data/gh-config"
 export PI_CONFIG="$root/data/config"
 export PI_SESSIONS="$session"
 export PI_WORKSPACE="$workspace"

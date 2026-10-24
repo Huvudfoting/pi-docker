@@ -3,7 +3,8 @@
 Run Pi in disposable Docker containers with persistent configuration and sessions.
 
 - [Everyday usage](setup/README.md)
-- [Installation and authentication](setup/SETUP.md)
+- [Installation](setup/SETUP.md)
+- [OpenAI/provider login and GitHub authentication](setup/AUTHENTICATION.md)
 - [Extensions, configuration, and maintenance](setup/CUSTOMIZATION.md)
 - [Agent setup-discovery instructions](setup/AGENTS.md)
 
@@ -13,6 +14,7 @@ Run Pi in disposable Docker containers with persistent configuration and session
 setup/                   # Non-secret deployment source; mounted read-only in Pi
   README.md
   SETUP.md
+  AUTHENTICATION.md
   CUSTOMIZATION.md
   AGENTS.md
   extensions/            # Homemade extensions only; downloaded ones are image npm packages
@@ -24,6 +26,7 @@ setup/                   # Non-secret deployment source; mounted read-only in Pi
   ollama/.env.example
 data/                    # Private local state; ignored by Git; never mount as setup
   config/
+  gh-config/             # Optional hosts.yml token; mounted read-only for gh
   sessions/
   ollama.env
 ```
