@@ -38,6 +38,6 @@ exec docker compose -f "$setup/pi/compose.yaml" run --rm pi \
   --extension /usr/local/lib/node_modules/pi-rewind-hook/index.ts \
   --extension /usr/local/lib/node_modules/pi-web-access \
   --extension /usr/local/lib/node_modules/@juicesharp/rpiv-ask-user-question \
-  --extension /usr/local/lib/node_modules/@llblab/pi-codex-usage \
+  --extension /usr/local/lib/node_modules/@specode/pi-subscription-usage \
   --extension /opt/pi-docker/extensions \
   "$@"

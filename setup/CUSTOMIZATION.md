@@ -25,6 +25,11 @@ automatic Python downloads; use the image-provided interpreter.
   go in `setup/extensions/`, mounted read-only at `/opt/pi-docker/extensions/`
   and loaded by the `pi` launcher. Personal/project folders are listed below.
 
+### Subscription usage extension
+
+`@specode/pi-subscription-usage` requires an **Openai Codex (Legacy)** provider
+in addition to the usual OpenAI token in order to authorize API access.
+
 ## Quick reference
 
 `PI_CODING_AGENT_DIR=/pi/agent` replaces upstream's default `~/.pi/agent`.
