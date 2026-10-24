@@ -9,7 +9,14 @@ start another model server.
 
 ## Launching
 
-Run these commands on the host after installing the launcher:
+Build the image once before launching Pi:
+
+```bash
+docker build -t pi-agent:latest ./setup/pi
+```
+
+Run these commands on the host after installing the launcher. If the image is
+missing, `pi` prints the build command and repository directory to use.
 
 | Command | Action |
 |---|---|

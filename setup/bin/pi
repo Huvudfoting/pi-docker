@@ -5,6 +5,11 @@ setup="$(dirname -- "$(dirname -- "$script")")"
 root="$(dirname -- "$setup")"
 workspace="$PWD"
 name=""
+
+if ! docker image inspect pi-agent:latest >/dev/null 2>&1; then
+  printf 'No pi-agent image, build it with: docker build -t pi-agent:latest ./setup/pi from the pi-docker directory\n' >&2
+  exit 1
+fi
 if [[ $# -gt 0 && "$1" != -* ]]; then workspace="$1"; shift; fi
 while (($#)); do
   case "$1" in

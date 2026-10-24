@@ -1,8 +1,8 @@
 # Homemade extensions only
 
-Add `.ts`/`.js` files or subdirectories with `index.ts`/`index.js`. Both launchers
-load this folder at `/opt/pi-docker/extensions` (read-only). Run `/reload` in each
-affected session after edits; no rebuild needed.
+Add `.ts`/`.js` files or subdirectories with `index.ts`/`index.js`. The `pi`
+launcher loads this folder at `/opt/pi-docker/extensions` (read-only). Run
+`/reload` in each affected session after edits; no rebuild needed.
 
 Keep `package.json`: its Pi manifest makes this folder a loadable package,
 including when it contains no extensions. It discovers top-level `.ts`/`.js`

@@ -33,7 +33,7 @@ there, never under `setup/`. The Pi image build context is only `setup/pi/`.
 The setup mount exposes current host source, which may be newer than the image.
 Missing deployment mount sources fail rather than being created silently.
 
-Both launchers append `/opt/pi-docker/AGENTS.md` to the system prompt, making
+The launcher appends `/opt/pi-docker/AGENTS.md` to the system prompt, making
 these guides discoverable even when `/workspace` is a different repository.
 Direct `docker run` invocations do not provide the mount or those instructions.
 
@@ -52,25 +52,28 @@ docker compose --env-file data/ollama.env -f setup/ollama/compose.yaml up -d
 ```
 
 Other containers on the shared network reach `http://ollama:11434`. Only host
-localhost port 11434 is published. Pull the models you want to use, for example:
-
-```bash
-docker exec ollama ollama pull qwen3.5:9b-q4_K_M
-```
+localhost port 11434 is published.
 
 If you change `OLLAMA_NETWORK` in `data/ollama.env`, also export that same value
-in the host shell before using `pi` or `pi-login`. The Pi launchers do not source
-the Ollama environment file.
+in the host shell before using `pi`. The launcher does not source the Ollama
+environment file.
 
 ## 2. Build Pi and authenticate
 
+Build the Pi image before running the launcher:
+
 ```bash
-chmod +x setup/bin/pi setup/bin/pi-login
-./setup/bin/pi-login
+chmod +x setup/bin/pi
+docker build -t pi-agent:latest ./setup/pi
 ```
 
-This builds the image and starts Pi with `setup/` as its workspace, shared
-configuration, login session storage, and the standard instructions and extensions.
+The launcher checks for this image and prints the build command if it is missing.
+For initial authentication, launch Pi with the repository directory as the
+workspace.
+
+```pi
+cd <repo-dir> && ./setup/bin/pi
+```
 
 Inside Pi, run `/login`, choose your provider, and complete its browser flow.
 For a manual OAuth callback, paste the callback URL into Pi when prompted.

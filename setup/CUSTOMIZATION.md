@@ -18,12 +18,12 @@ automatic Python downloads; use the image-provided interpreter.
 
 - **All downloaded/third-party extensions:** install `package@latest` with npm in
   `setup/pi/Dockerfile`, baked into the image. Explicitly load them with
-  `--extension` in both `setup/bin/pi` and `setup/bin/pi-login`; global npm
-  installation alone does not load an extension. Do not vendor upstream code
-  into custom folders or deploy it with runtime `pi install`.
+  `--extension` in `setup/bin/pi`; global npm installation alone does not load
+  an extension. Do not vendor upstream code into custom folders or deploy it
+  with runtime `pi install`.
 - **Homemade extensions:** keep code in extension folders. Repository-owned tools
   go in `setup/extensions/`, mounted read-only at `/opt/pi-docker/extensions/`
-  and loaded by both launchers. Personal/project folders are listed below.
+  and loaded by the `pi` launcher. Personal/project folders are listed below.
 
 ## Quick reference
 
@@ -60,12 +60,12 @@ The Python/uv image tags and npm `@latest` track current releases rather than
 pinning versions. Pull fresh images and bypass build caches to update them:
 
 ```bash
-docker build --pull --no-cache -t pi-agent:latest ./setup/pi
+docker build --no-cache -t pi-agent:latest ./setup/pi
 docker run --rm pi-agent:latest --version
 ```
 
-After rebuilding, launch with `pi` or `setup/bin/pi-login` and smoke-test the
-extensions and models. Inside a container, check versions with `node --version`,
+After rebuilding, launch with `pi` and smoke-test the extensions and models.
+Inside a container, check versions with `node --version`,
 `python --version`, `uv --version`, and `npm list -g --depth=0`.
 Docker is unavailable inside the container; do not update global packages there.
 Direct `docker run` is only an image smoke test, not a configured launcher session.

@@ -13,7 +13,7 @@ Essential rules:
 - Node.js and Python are available. Prefer uv with project-local `.venv`
   environments; automatic Python downloads are disabled. No global installs.
 - Downloaded extensions belong in the Dockerfile as npm `@latest`, explicitly
-  loaded by both launchers; homemade extensions use mounted resource folders.
+  loaded by the `pi` launcher; homemade extensions use mounted resource folders.
 - Image/package updates require a host rebuild and new containers; Docker is
   unavailable here. See the maintenance guide for reload/restart rules.
 - Shared edits affect other instances; avoid concurrent configuration changes.
