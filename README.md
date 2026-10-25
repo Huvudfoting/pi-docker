@@ -3,7 +3,7 @@
 Run Pi in disposable Docker containers with persistent configuration and sessions.
 
 - [Everyday usage](setup/README.md)
-- [Optional Herdr integration and host trial](setup/README.md#herdr)
+- [Optional Herdr integration and host trial](setup/HERDER_INTEGRATION.md)
 - [Installation](setup/SETUP.md)
 - [OpenAI/provider login and GitHub authentication](setup/AUTHENTICATION.md)
 - [Extensions, configuration, and maintenance](setup/CUSTOMIZATION.md)
@@ -14,6 +14,7 @@ Run Pi in disposable Docker containers with persistent configuration and session
 ```text
 setup/                   # Non-secret deployment source; mounted read-only in Pi
   README.md
+  HERDER_INTEGRATION.md
   SETUP.md
   AUTHENTICATION.md
   CUSTOMIZATION.md

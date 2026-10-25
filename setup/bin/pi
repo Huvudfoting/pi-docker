@@ -33,7 +33,7 @@ are not yet bridged; socket replacement recovery is not guaranteed.
 
 Install/update the official extension on the host, from the docker-pi repo root:
   setup/bin/add-herdr-integration install
-Usage and host trial: setup/README.md (Herdr)'
+Usage and host trial: setup/HERDER_INTEGRATION.md'
 }
 
 parse_arguments() {

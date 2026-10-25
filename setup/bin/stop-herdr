@@ -4,13 +4,12 @@ const net = require("node:net");
 const fs = require("node:fs");
 const { randomUUID } = require("node:crypto");
 
-const usage = `Usage inside Docker-Pi: /opt/pi-docker/bin/stop-herdr --yes
+const usage = `Usage inside Docker-Pi: /opt/pi-docker/bin/stop-herdr
 
 Stops the ENTIRE Herdr session connected through HERDR_SOCKET_PATH, including
 all its panes and processes, not just this Pi container. Requires a --herdr
 launch. This is not detach; use Ctrl+B, then Q to leave Herdr without stopping it.
 
---yes       Explicitly confirm stopping the entire connected session.
 --help, -h  Show this help without contacting Herdr.
 
 The container may terminate before the acknowledgement can be displayed.
@@ -27,8 +26,8 @@ if (args.length === 1 && ["--help", "-h"].includes(args[0])) {
   console.log(usage);
   process.exit(0);
 }
-if (args.length !== 1 || args[0] !== "--yes") {
-  fail("This stops ALL panes in the connected Herdr session. Pass --yes to confirm, or --help for usage.");
+if (args.length !== 0) {
+  fail("Unexpected arguments. Run without arguments to stop ALL panes in the connected Herdr session, or use --help for usage.");
 }
 
 const socketPath = process.env.HERDR_SOCKET_PATH;

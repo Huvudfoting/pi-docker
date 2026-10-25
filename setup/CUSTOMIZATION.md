@@ -28,14 +28,12 @@ automatic Python downloads; use the image-provided interpreter.
 
 ### Herdr-managed exception
 
-The official `herdr-agent-state.ts` is installed and updated by host Herdr into
-`data/config/extensions/`. Run `setup/bin/add-herdr-integration install` on the host; the
-script selects this deployment's `PI_CODING_AGENT_DIR` automatically and delegates
-to Herdr. Re-run it after updating Herdr, or use `setup/bin/add-herdr-integration uninstall`
-to remove only the managed extension. It is not an image-managed npm package
-and must not be vendored or modified here. Pi discovers it normally at
-`/pi/agent/extensions/`; it remains inactive without Herdr context. See
-[Herdr usage and the host trial](README.md#herdr).
+The official `herdr-agent-state.ts` is managed by host Herdr in
+`data/config/extensions/` and discovered by Pi at `/pi/agent/extensions/`.
+It is not an image-managed npm package and must not be vendored or modified
+here; it remains inactive without Herdr context. See
+[Herdr installation and updates](HERDER_INTEGRATION.md#scope-and-installation)
+for the host installer, update, and removal workflow.
 
 ### Subscription usage extension
 

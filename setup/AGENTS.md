@@ -15,10 +15,24 @@ Read only the relevant mounted guide; do not search `/workspace` for these docs:
 - OpenAI/provider login and GitHub credentials: `/opt/pi-docker/AUTHENTICATION.md`.
 - Runtimes, resources, extension policy, maintenance: `/opt/pi-docker/CUSTOMIZATION.md`.
 - Launcher and session usage: `/opt/pi-docker/README.md`.
+- Herdr integration, diagnostics, restore, and shutdown:
+  `/opt/pi-docker/HERDER_INTEGRATION.md`.
+
+## Herdr context and safety
+- To identify connected Herdr mode, check only `HERDR_ENV`, `HERDR_PANE_ID`, and
+  `HERDR_SOCKET_PATH`: expect `HERDR_ENV=1`, a nonempty pane ID, and an existing
+  Unix socket. `PI_*` variables and a shell tool's non-TTY status do not establish
+  whether Pi is in a Herdr pane. Missing context does not prove the host terminal
+  is outside Herdr; ordinary launches intentionally do not expose the integration.
+- Never manufacture pane context or probe the control API just to identify it.
+  Local context checks do not prove live connectivity or reporting readiness.
+- The mounted socket controls the entire connected Herdr session, including
+  other panes; the pane ID is not an access restriction. Do not control other
+  panes or stop the session without an explicit user request.
 
 ## Herdr shutdown
 When explicitly asked to stop the entire connected Herdr session, use
-`/opt/pi-docker/bin/stop-herdr --yes` through the shell tool. This stops all panes
+`/opt/pi-docker/bin/stop-herdr` through the shell tool. This stops all panes
 and processes, not just Pi; clarify first if the user only wants to exit Pi or
 detach. The helper requires a `--herdr` launch. It may terminate this container
 before acknowledgement; do not automatically retry an ambiguous result.

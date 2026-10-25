@@ -93,9 +93,20 @@ The launcher resolves symlinks to find this repository, independently of the
 current workspace. `pi --help` shows launcher usage without requiring Docker;
 `pi -- --help` opens Pi's own help through Docker.
 
-For optional Herdr integration, run `./setup/bin/add-herdr-integration install` on the host.
-It targets this deployment's configuration automatically. See
-[Herdr usage and local diagnostics](README.md#herdr) for scope and security.
+### Optional Herdr integration
+
+With Herdr already installed on the host, install its official Pi extension into
+this deployment's configuration:
+
+```bash
+./setup/bin/add-herdr-integration install
+```
+
+No image rebuild is needed; start a new container from a Herdr pane with
+`pi /absolute/path/to/project --herdr` to enable the integration. Ordinary
+launches do not expose Herdr's control socket. See
+[Herdr integration](HERDER_INTEGRATION.md) for requirements, updates/removal,
+restore, diagnostics, and socket security.
 
 ## Security and concurrency
 
@@ -114,7 +125,7 @@ It targets this deployment's configuration automatically. See
   same checkout. Use separate Git worktrees for concurrent writing agents.
 - This is process/filesystem isolation, not a hardened sandbox. Agents can modify
   mounted projects and reach services on the shared Docker network.
-- Optional [Herdr mode](README.md#herdr) exposes Herdr's full local control
+- Optional [Herdr mode](HERDER_INTEGRATION.md) exposes Herdr's full local control
   socket, including control of other panes. Use it only with trusted containers;
   ordinary launches do not mount that socket.
 - No Docker socket is mounted and Docker is not installed in the Pi image.

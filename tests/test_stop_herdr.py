@@ -61,7 +61,7 @@ class StopHerdrTest(unittest.TestCase):
 
         thread = threading.Thread(target=serve, daemon=True)
         thread.start()
-        result = self.run_helper("--yes")
+        result = self.run_helper()
         thread.join(timeout=5)
         self.assertFalse(thread.is_alive(), "mock server did not finish")
         self.assertEqual(errors, [])
@@ -70,12 +70,12 @@ class StopHerdrTest(unittest.TestCase):
         self.assertEqual(requests[0]["params"], {})
         return result
 
-    def test_help_confirmation_and_context_never_contact_socket(self):
-        for args, expected in ((("--help",), 0), ((), 2), (("--yes", "extra"), 2)):
+    def test_help_invalid_arguments_and_context_never_contact_socket(self):
+        for args, expected in ((("--help",), 0), (("-h",), 0), (("--yes",), 2), (("extra",), 2)):
             with self.subTest(args=args):
                 result = self.run_helper(*args)
                 self.assertEqual(result.returncode, expected, result.stderr)
-        result = self.run_helper("--yes", env={**self.env, "HERDR_ENV": ""})
+        result = self.run_helper(env={**self.env, "HERDR_ENV": ""})
         self.assertEqual(result.returncode, 2)
         self.assertIn("launched with --herdr", result.stderr)
         self.listener.settimeout(0.02)
