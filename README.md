@@ -3,6 +3,7 @@
 Run Pi in disposable Docker containers with persistent configuration and sessions.
 
 - [Everyday usage](setup/README.md)
+- [Optional Herdr integration and host trial](setup/README.md#herdr)
 - [Installation](setup/SETUP.md)
 - [OpenAI/provider login and GitHub authentication](setup/AUTHENTICATION.md)
 - [Extensions, configuration, and maintenance](setup/CUSTOMIZATION.md)

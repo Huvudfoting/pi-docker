@@ -5,19 +5,60 @@ setup="$(dirname -- "$(dirname -- "$script")")"
 root="$(dirname -- "$setup")"
 workspace="$PWD"
 name=""
+herdr=0
+restore_ref=""
+namespace=/pi/herdr-sessions
+records="$root/data/herdr-launches"
+
+fail() { printf 'pi-docker: %s\n' "$*" >&2; exit 2; }
+
+storage_key() {
+  printf '%s\0%s' "$workspace" "$name" | sha256sum | cut -d' ' -f1
+}
 
 if ! docker image inspect pi-agent:latest >/dev/null 2>&1; then
   printf 'No pi-agent image, build it with: docker build -t pi-agent:latest ./setup/pi from the pi-docker directory\n' >&2
   exit 1
 fi
-if [[ $# -gt 0 && "$1" != -* ]]; then workspace="$1"; shift; fi
-while (($#)); do
-  case "$1" in
-    --name) [[ $# -ge 2 ]] || { echo "--name needs a value" >&2; exit 2; }; name="$2"; shift 2 ;;
-    --) shift; break ;;
-    *) break ;;
-  esac
-done
+# Herdr's native Pi restore is exactly: pi --session <reported-path>.
+# A managed reference resumes a previous opt-in; it must never fall back to CWD.
+if [[ ${1:-} == --session && ( ${2:-} == "$namespace" || ${2:-} == "$namespace/"* ) ]]; then
+  [[ $# == 2 ]] || fail "Managed restore accepts only: pi --session <managed-path>"
+  herdr=1
+  restore_ref="$2"
+  reference="${restore_ref#"$namespace/"}"
+  key="${reference%%/*}"
+  filename="${reference#*/}"
+  [[ "$key" =~ ^[a-f0-9]{64}$ && "$filename" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*\.jsonl$ ]] \
+    || fail "Invalid managed session reference: $restore_ref"
+  record="$records/$key.record"
+  [[ -f "$record" && -r "$record" && -O "$record" && ! -L "$record" ]] \
+    || fail "Missing or invalid Herdr launch record: $record"
+  # NUL-delimited data, never sourced as executable shell configuration.
+  {
+    IFS= read -r -d '' version && IFS= read -r -d '' workspace && IFS= read -r -d '' name \
+      || fail "Incomplete Herdr launch record: $record"
+    extra=""
+    if IFS= read -r -d '' extra || [[ -n "$extra" ]]; then
+      fail "Unexpected data in Herdr launch record: $record"
+    fi
+  } < "$record"
+  [[ "$version" == pi-docker-herdr-v1 && "$workspace" == /* && -n "$name" ]] \
+    || fail "Invalid Herdr launch record: $record"
+  [[ "$(storage_key)" == "$key" ]] || fail "Herdr launch record does not match its storage key"
+  [[ "$(realpath -e -- "$workspace")" == "$workspace" ]] \
+    || fail "Recorded workspace moved or no longer exists: $workspace"
+else
+  if [[ $# -gt 0 && "$1" != -* ]]; then workspace="$1"; shift; fi
+  while (($#)); do
+    case "$1" in
+      --name) [[ $# -ge 2 ]] || fail "--name needs a value"; name="$2"; shift 2 ;;
+      --herdr) herdr=1; shift ;;
+      --) shift; break ;;
+      *) break ;;
+    esac
+  done
+fi
 workspace="$(realpath -e -- "$workspace")"
 [[ -d "$workspace" ]] || { echo "Not a directory: $workspace" >&2; exit 2; }
 [[ -n "$name" ]] || name="$(basename "$workspace")"
@@ -25,6 +66,63 @@ workspace="$(realpath -e -- "$workspace")"
 # Unique path-derived hash prevents same-name projects from sharing session data.
 hash="$(printf '%s' "$workspace" | sha256sum | cut -c1-12)"
 session="$root/data/sessions/${name}-${hash}"
+export PI_SESSION_TARGET=/pi/sessions
+compose=(-f "$setup/pi/compose.yaml")
+if ((herdr)); then
+  [[ "$(uname -s)" == Linux ]] || fail "Herdr mode currently supports local Linux Docker Engine only"
+  [[ -t 0 && -t 1 ]] || fail "Herdr mode requires an interactive terminal (stdin and stdout)"
+  [[ ${HERDR_ENV:-} == 1 && -n ${HERDR_PANE_ID:-} ]] \
+    || fail "Herdr mode requires a current Herdr pane (HERDR_ENV=1 and HERDR_PANE_ID)"
+  [[ ${HERDR_SOCKET_PATH:-} == /* && -S ${HERDR_SOCKET_PATH:-} && -O ${HERDR_SOCKET_PATH:-} ]] \
+    || fail "HERDR_SOCKET_PATH must select an existing Unix socket owned by the current user"
+  HERDR_SOCKET_HOST_PATH="$(realpath -e -- "$HERDR_SOCKET_PATH")"
+  export HERDR_SOCKET_HOST_PATH
+  [[ -r "$root/data/config/extensions/herdr-agent-state.ts" ]] \
+    || fail "Install the official Herdr Pi extension into $root/data/config; see setup/README.md (Herdr)"
+
+  if [[ -z "$restore_ref" ]]; then
+    # First slice: persistent TUI only, using the launcher's managed storage.
+    case "${1:-}" in
+      install|remove|uninstall|update|list|config|auth|mcp)
+        fail "Run Pi maintenance commands without --herdr" ;;
+    esac
+    # Respect Pi's own -- delimiter, after which flags are prompt text.
+    for arg in "$@"; do
+      case "$arg" in
+        --) break ;;
+        --session|--session=*|--fork|--fork=*)
+          fail "In Herdr mode use --continue or --resume; explicit session paths/forks are reserved for native restore" ;;
+        --session-dir|--session-dir=*|--no-session|--no-extensions|-ne)
+          fail "Herdr mode requires managed persistent storage and standard extension discovery: $arg" ;;
+        --print|-p|--mode|--mode=*|--export|--export=*|--version|-v|--help|-h|--list-models|--list-models=*)
+          fail "Herdr mode supports interactive TUI sessions only: $arg" ;;
+      esac
+    done
+  fi
+
+  key="$(storage_key)"
+  export PI_SESSION_TARGET="$namespace/$key"
+  if [[ -n "$restore_ref" ]]; then
+    [[ -d "$session" && -f "$session/$filename" ]] \
+      || fail "Cannot restore missing session: $session/$filename"
+    [[ "$(realpath -e -- "$session/$filename")" == "$session/$filename" ]] \
+      || fail "Managed session must not resolve outside its recorded storage"
+  else
+    # Immutable association: the same selection produces the same record.
+    # Atomic publication permits parallel launches without partially read data.
+    (umask 077; mkdir -p "$records")
+    record="$records/$key.record"
+    temporary="$(umask 077; mktemp "$records/.launch.XXXXXX")"
+    trap 'rm -f -- "$temporary"' EXIT
+    printf '%s\0%s\0%s\0' pi-docker-herdr-v1 "$workspace" "$name" > "$temporary"
+    if [[ -e "$record" ]] && ! cmp -s -- "$temporary" "$record"; then
+      fail "Conflicting Herdr launch record: $record"
+    fi
+    mv -f -- "$temporary" "$record"
+    trap - EXIT
+  fi
+  compose+=(-f "$setup/pi/compose.herdr.yaml")
+fi
 mkdir -p "$session" "$root/data/config"
 # An empty directory permits unauthenticated use; never generate credentials here.
 (umask 077; mkdir -p "$root/data/gh-config")
@@ -36,7 +134,11 @@ export PI_UID="$(id -u)"
 export PI_GID="$(id -g)"
 export OLLAMA_NETWORK="${OLLAMA_NETWORK:-pi-ollama}"
 
-exec docker compose -f "$setup/pi/compose.yaml" run --rm pi \
+# Only the interactive Herdr wrapper advertises Pi to host process detection.
+# Never export this hint globally or rely on setting it inside the container.
+if ((herdr)); then export HERDR_AGENT=pi; fi
+
+exec docker compose "${compose[@]}" run --rm pi \
   --append-system-prompt /opt/pi-docker/AGENTS.md \
   --extension /usr/local/lib/node_modules/pi-rewind-hook/index.ts \
   --extension /usr/local/lib/node_modules/pi-web-access \

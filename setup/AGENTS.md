@@ -1,8 +1,9 @@
 # Pi Docker
 
 Disposable container: `/workspace` is the writable project, `/pi/agent` is shared
-configuration/credentials, `/pi/sessions` is session storage, and `/opt/pi-docker`
-is read-only deployment source (possibly newer than the image).
+configuration/credentials, session storage is `/pi/sessions` (or
+`/pi/herdr-sessions/<key>` in Herdr mode), and `/opt/pi-docker` is read-only
+deployment source (possibly newer than the image).
 
 ## Execution boundary
 You are running inside a Pi Docker container, not on the host.

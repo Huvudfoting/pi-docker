@@ -3,3 +3,6 @@
 .env
 .env.*
 !.env.example
+
+# Local Python launcher checks.
+__pycache__/

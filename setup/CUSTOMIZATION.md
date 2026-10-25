@@ -17,7 +17,7 @@ automatic Python downloads; use the image-provided interpreter.
 
 ## Extension architecture decision
 
-- **All downloaded/third-party extensions:** install `package@latest` with npm in
+- **Downloaded/third-party extensions (except Herdr below):** install `package@latest` with npm in
   `setup/pi/Dockerfile`, baked into the image. Explicitly load them with
   `--extension` in `setup/bin/pi`; global npm installation alone does not load
   an extension. Do not vendor upstream code into custom folders or deploy it
@@ -25,6 +25,14 @@ automatic Python downloads; use the image-provided interpreter.
 - **Homemade extensions:** keep code in extension folders. Repository-owned tools
   go in `setup/extensions/`, mounted read-only at `/opt/pi-docker/extensions/`
   and loaded by the `pi` launcher. Personal/project folders are listed below.
+
+### Herdr-managed exception
+
+The official `herdr-agent-state.ts` is installed and updated by host Herdr into
+`data/config/extensions/`, using a host `PI_CODING_AGENT_DIR` override. It is
+not an image-managed npm package and must not be vendored or modified here.
+Pi discovers it normally at `/pi/agent/extensions/`; it remains inactive without
+Herdr context. See [Herdr usage and the host trial](README.md#herdr).
 
 ### Subscription usage extension
 

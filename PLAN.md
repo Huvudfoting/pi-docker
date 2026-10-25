@@ -23,9 +23,10 @@ The central design is:
 > a minimal host-side workspace/storage mapping. Do not implement a second
 > lifecycle reporter.
 
-This design is conceptually feasible with the reviewed upstream behavior. It
-has not been runtime-validated, and compatibility depends on that behavior
-remaining available in the deployed Herdr and Pi versions.
+The first vertical slice is implemented. The user reported that the short host
+launch-and-restore trial succeeded, validating the core integration end to end
+in their local deployment. Compatibility still depends on the reviewed upstream
+behavior remaining available in the deployed Herdr and Pi versions.
 
 ## Documentation and source references
 
@@ -427,7 +428,7 @@ also require separate transport designs and are outside this plan.
 | Invalid or stale managed restore reference | Clear failure; no fallback conversation or arbitrary mounts |
 | Discovered managed extension outside Herdr mode | Inactive and not required for standalone use |
 | Headless Pi operation | No official TUI reporting or indiscriminate interactive host hint |
-| Participating question UI plus event adapter | Blocked transitions reach the official reporter |
+| Question extension's questionnaire UI | Blocked-event adapter is deferred; blocked reporting is not yet integrated |
 | Temporary connectivity failure | Pi continues; delivery remains best-effort |
 | Host replaces the socket inode | Existing mount may remain stale; automatic recovery not guaranteed |
 | Pi/container exits | Herdr's process-exit/idle-shell cleanup clears authority |
@@ -444,11 +445,40 @@ The conceptual decisions are settled:
 - separate Herdr Compose override;
 - local Linux and full-socket trusted-container scope.
 
-Implementation must choose the namespace spelling, storage-key/record format,
-and argument-handling details without changing these responsibilities. It must
-also define handling of session-directory overrides and any additional launch
-options beyond the minimum restore promise. These are bounded compatibility
-details, not reasons to introduce a custom lifecycle integration.
+The first vertical slice implements `/pi/herdr-sessions/<key>`, where the key
+is SHA-256 of the canonical workspace, a NUL separator, and the launcher name.
+Versioned, NUL-delimited launch records live at
+`data/herdr-launches/<key>.record`; the launcher reads them as data, never shell
+code. Publication is atomic, and conflicting records are not overwritten.
+
+This slice accepts only the exact native managed-path restore invocation.
+Initial Herdr launches can use `--continue` or `--resume`, but reject explicit
+CLI session/fork paths, session-directory overrides, ephemeral sessions,
+disabled extension discovery, and headless/maintenance invocations. Pi's
+interactive session operations remain available. Other CLI flags are not
+recorded for replay. The blocked-event adapter remains deferred.
+
+### Validation status
+
+The user completed the short host trial documented in `setup/README.md` and
+reported that it worked successfully. This provides end-to-end confirmation of
+the core launch-and-restore path in that deployment:
+
+- interactive Docker-Pi launch in Herdr with the official extension;
+- host wrapper identification and socket-based state/session reporting;
+- native restore into the original workspace, storage selection, and conversation.
+
+The local Bash syntax and five focused fake-Docker launcher checks also passed.
+Those checks cover launcher routing and failure handling; the successful host
+trial supplies the real Docker/Herdr validation they could not provide.
+
+Treat this working slice as the baseline. The questionnaire blocked-event
+adapter remains deferred at the user's request. Socket-inode replacement
+recovery, broader CLI-option replay, and cross-platform support remain outside
+the validated scope. The host trial does not establish those capabilities or
+guarantee compatibility with other Herdr/Pi versions. Broader launch-option
+compatibility remains a bounded follow-up, not a reason to introduce a custom
+lifecycle integration.
 
 The resulting integration follows official Pi reporting and native Herdr
 restore while confining Docker-specific adaptation to host process identity,
