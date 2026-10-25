@@ -299,6 +299,10 @@ Use a disposable named session so restart/shutdown cannot affect real work:
 
 ## Remaining work and non-goals
 
+- **Pane-to-pane communication in Herdr:** explore communication between agents
+  in separate panes, including appropriate control and permission boundaries.
+- **Herdr Git worktree integration:** explore using Herdr's worktree support for
+  isolated, concurrent agent work.
 - **Questionnaire blocked-state adapter — deferred at the user's request.**
   `@juicesharp/rpiv-ask-user-question` emits `rpiv:ask-user:blocked`, whereas the
   official reporter consumes `herdr:blocked`. If implemented, bridge balanced
