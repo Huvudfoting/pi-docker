@@ -4,6 +4,7 @@ Run: python3 -m unittest discover -s tests -p 'test_*.py' -v
 The real Herdr launch/restart trial still runs on the host.
 """
 
+from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 from pathlib import Path
@@ -59,7 +60,8 @@ class HerdrLauncherTest(unittest.TestCase):
         self.env.update(HERDR_ENV="1", HERDR_PANE_ID="w1:p1", HERDR_SOCKET_PATH=str(self.sock))
         extension = self.root / "data/config/extensions/herdr-agent-state.ts"
         extension.parent.mkdir(parents=True)
-        extension.write_text("// Installation placeholder; not an upstream extension copy.\n")
+        extension.write_text("// managed test fixture v9\n")
+        self.fake_herdr()
 
     def make_socket(self, name):
         endpoint = self.root / name
@@ -107,14 +109,24 @@ class HerdrLauncherTest(unittest.TestCase):
             "import json, os, sys\n"
             "from pathlib import Path\n"
             "config = Path(os.environ['PI_CODING_AGENT_DIR'])\n"
-            "with open(os.environ['HERDR_LOG'], 'w') as f:\n"
-            "    json.dump({'args': sys.argv[1:], 'config': str(config)}, f)\n"
+            "call = {'args': sys.argv[1:], 'config': str(config)}\n"
+            "with open(os.environ['HERDR_LOG'], 'w') as f: json.dump(call, f)\n"
+            "with open(os.environ['HERDR_LOG'] + '.history', 'a') as f: f.write(json.dumps(call) + '\\n')\n"
             "if os.environ.get('HERDR_EXIT'): sys.exit(int(os.environ['HERDR_EXIT']))\n"
             "target = config / 'extensions/herdr-agent-state.ts'\n"
-            "if sys.argv[1:] == ['integration', 'install', 'pi']:\n"
+            "if sys.argv[1:] == ['integration', 'status']:\n"
+            "    state = os.environ.get('HERDR_STATUS')\n"
+            "    if state == 'malformed': print('pi: new unknown format'); sys.exit(0)\n"
+            "    if state == 'duplicate': print(f'pi: current (v9) ({target})')\n"
+            "    if not state or state == 'duplicate':\n"
+            "        state = 'not installed' if not target.exists() else ('current (v9)' if 'v9' in target.read_text() else ('outdated (v1 < v9)' if 'v1' in target.read_text() else 'outdated (legacy < v9)'))\n"
+            "    print(f'pi: {state} ({target})')\n"
+            "elif sys.argv[1:] == ['integration', 'install', 'pi']:\n"
+            "    import time\n"
+            "    time.sleep(float(os.environ.get('HERDR_INSTALL_DELAY', '0')))\n"
             "    if not os.environ.get('HERDR_SKIP_WRITE'):\n"
             "        target.parent.mkdir(exist_ok=True)\n"
-            "        target.write_text('// managed test fixture\\n')\n"
+            "        target.write_text('// managed test fixture v9\\n')\n"
             "elif sys.argv[1:] == ['integration', 'uninstall', 'pi']:\n"
             "    target.unlink(missing_ok=True)\n"
             "else: sys.exit(64)\n"
@@ -130,7 +142,7 @@ class HerdrLauncherTest(unittest.TestCase):
         result = self.run_command(self.setup / "bin/pi", "--help")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("--herdr-status", result.stdout)
-        self.assertIn("setup/bin/add-herdr-integration install", result.stdout)
+        self.assertIn("setup/bin/herdr-extension install", result.stdout)
         self.assertNotIn(str(self.root), result.stdout)
         self.assertNotRegex(result.stdout, r"(?:^|\s)/[^\s]*")
         result = self.run_command(self.setup / "bin/pi", str(self.project), "--name", "backend", "--herdr-status")
@@ -142,6 +154,7 @@ class HerdrLauncherTest(unittest.TestCase):
         self.assertIn("informational here", result.stdout)
         self.assertNotIn(private.read_text(), result.stdout + result.stderr)
         self.assertEqual(before, sorted(p.relative_to(self.root) for p in (self.root / "data").rglob("*")))
+        self.assertEqual(self.herdr_calls(), [])
         self.assertFalse(self.probes.exists())
 
     def test_status_reports_missing_context_and_extension_without_changes(self):
@@ -163,7 +176,7 @@ class HerdrLauncherTest(unittest.TestCase):
         private = config / "auth.json"
         private.write_text('TEST-ONLY-secret-do-not-print')
         alias = self.bin / "install-herdr"
-        alias.symlink_to(self.setup / "bin/add-herdr-integration")
+        alias.symlink_to(self.setup / "bin/herdr-extension")
         # Match the owning binary even if it is not named herdr on PATH.
         owning = herdr.with_name("owning-herdr")
         herdr.rename(owning)
@@ -182,7 +195,7 @@ class HerdrLauncherTest(unittest.TestCase):
     def test_installer_creates_only_needed_state_and_reports_failures(self):
         self.fake_herdr()
         shutil.rmtree(self.root / "data")  # Only this test's private fixture.
-        installer = self.setup / "bin/add-herdr-integration"
+        installer = self.setup / "bin/herdr-extension"
         for args in (("--help",), ("uninstall",), ("invalid",)):
             result = self.run_command(installer, *args)
             self.assertEqual(result.returncode, 2 if args == ("invalid",) else 0, result.stderr)
@@ -201,6 +214,146 @@ class HerdrLauncherTest(unittest.TestCase):
         self.assertEqual(result.returncode, 23)
         self.assertIn("Herdr install failed", result.stderr)
         self.assertFalse(self.probes.exists())
+
+    def herdr_calls(self):
+        history = Path(self.env['HERDR_LOG'] + '.history')
+        return [json.loads(line)['args'] for line in history.read_text().splitlines()] if history.exists() else []
+
+    def test_auto_current_enables_with_notice_without_rewriting(self):
+        extension = self.root / 'data/config/extensions/herdr-agent-state.ts'
+        before = extension.stat().st_mtime_ns
+        # Upstream accepts newer versions too; do not force an exact match.
+        result, invocation = self.launch(self.project, '--name', 'backend', env={**self.env, 'HERDR_STATUS': 'current (v99)'})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('Herdr integration enabled', result.stderr)
+        self.assertIn('including other panes', result.stderr)
+        self.assertIn('--no-herdr', result.stderr)
+        self.assertIn(str(self.setup / 'pi/compose.herdr.yaml'), invocation['args'])
+        self.assertEqual(self.herdr_calls(), [['integration', 'status']])
+        self.assertEqual(extension.stat().st_mtime_ns, before)
+
+    def test_auto_installs_missing_and_outdated_then_verifies(self):
+        extension = self.root / 'data/config/extensions/herdr-agent-state.ts'
+        private = extension.parents[1] / 'auth.json'
+        private.write_text('TEST-ONLY-secret-do-not-print')
+        for content, state in ((None, 'missing'), ('// old fixture', 'outdated'), ('// fixture v1', 'outdated')):
+            with self.subTest(state=state):
+                Path(self.env['HERDR_LOG'] + '.history').unlink(missing_ok=True)
+                if content is None:
+                    shutil.rmtree(self.root / 'data/config')
+                else:
+                    extension.write_text(content)
+                result, invocation = self.launch(self.project, '--name', 'backend', env={**self.env, 'PI_CODING_AGENT_DIR': '/wrong/config'})
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(f'integration is {state}', result.stderr)
+                self.assertIn('Herdr integration enabled', result.stderr)
+                self.assertEqual(self.herdr_calls(), [
+                    ['integration', 'status'], ['integration', 'install', 'pi'], ['integration', 'status'],
+                ])
+                self.assertIn('v9', extension.read_text())
+                self.assertIn('/pi/herdr-sessions/', invocation['env']['PI_SESSION_TARGET'])
+                if content is not None:
+                    self.assertEqual(private.read_text(), 'TEST-ONLY-secret-do-not-print')
+                private.write_text('TEST-ONLY-secret-do-not-print')
+                self.assertNotIn(private.read_text(), result.stderr)
+
+    def test_disabled_no_context_and_ineligible_launches_never_invoke_herdr(self):
+        for args, patch in (
+            (('--no-herdr',), {'HERDR_AGENT': 'inherited'}),
+            ((), {'HERDR_ENV': '', 'HERDR_PANE_ID': '', 'HERDR_SOCKET_PATH': ''}),
+            (('--', '--print', 'hello'), {}),
+            (('--', 'update'), {}),
+            (('--', '--no-session'), {}),
+            (('--', '--no-extensions'), {}),
+            (('--', '--session', '/explicit.jsonl'), {}),
+        ):
+            with self.subTest(args=args, patch=patch):
+                result, invocation = self.launch(self.project, '--name', 'backend', *args, env={**self.env, **patch})
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertNotIn(str(self.setup / 'pi/compose.herdr.yaml'), invocation['args'])
+                self.assertIsNone(invocation['env']['HERDR_AGENT'])
+                self.assertEqual(self.herdr_calls(), [])
+        result = self.run_command(self.setup / 'bin/pi', str(self.project), '--name', 'backend')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.herdr_calls(), [])
+        self.assertFalse((self.root / 'data/herdr-launches').exists())
+
+    def test_auto_failures_fall_back_but_required_launches_fail(self):
+        for patch in (
+            {'HERDR_EXIT': '23'},
+            {'HERDR_STATUS': 'malformed'},
+            {'HERDR_STATUS': 'duplicate'},
+            {'HERDR_STATUS': 'outdated (v1 < v9)', 'HERDR_SKIP_WRITE': '1'},
+            {'HERDR_BIN_PATH': '/missing/herdr'},
+            {'HERDR_SOCKET_PATH': '/missing/socket'},
+            {'HERDR_PANE_ID': ''},
+        ):
+            with self.subTest(patch=patch):
+                env = {**self.env, **patch}
+                result, invocation = self.launch(self.project, '--name', 'backend', env=env)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn('reporting and native restore are unavailable', result.stderr)
+                self.assertNotIn('Herdr integration enabled', result.stderr)
+                self.assertEqual(invocation['env']['PI_SESSION_TARGET'], '/pi/sessions')
+                self.assertNotIn(str(self.setup / 'pi/compose.herdr.yaml'), invocation['args'])
+                result, invocation = self.launch(self.project, '--name', 'backend', '--herdr', env=env)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIsNone(invocation)
+        self.assertFalse((self.root / 'data/herdr-launches').exists())
+
+    def test_restore_integration_failure_never_falls_back(self):
+        original = self.initial_launch()
+        (Path(original['env']['PI_SESSIONS']) / 'persisted.jsonl').touch()
+        result, invocation = self.launch('--session', original['env']['PI_SESSION_TARGET'] + '/persisted.jsonl',
+                                         env={**self.env, 'HERDR_EXIT': '23'})
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIsNone(invocation)
+        self.assertNotIn('launching without socket access', result.stderr)
+
+    def test_ensure_uses_selected_host_binary_and_deployment_only(self):
+        owning = self.bin / 'owning-herdr'
+        (self.bin / 'herdr').rename(owning)
+        result, invocation = self.launch(self.project, '--name', 'backend', env={
+            **self.env, 'HERDR_BIN_PATH': str(owning), 'PI_CODING_AGENT_DIR': '/wrong/config',
+        })
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('Herdr integration enabled', result.stderr)
+        call = json.loads(Path(self.env['HERDR_LOG']).read_text())
+        self.assertEqual(call['config'], str(self.root / 'data/config'))
+        self.assertEqual(self.herdr_calls(), [['integration', 'status']])
+
+    def test_unknown_status_does_not_install_or_modify_extension(self):
+        extension = self.root / 'data/config/extensions/herdr-agent-state.ts'
+        before = extension.read_bytes()
+        result = self.run_command(self.setup / 'bin/herdr-extension', 'ensure',
+                                  env={**self.env, 'HERDR_STATUS': 'malformed'})
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertEqual(extension.read_bytes(), before)
+        self.assertEqual(self.herdr_calls(), [['integration', 'status']])
+
+    def test_current_status_cannot_mask_an_empty_extension(self):
+        (self.root / 'data/config/extensions/herdr-agent-state.ts').write_text('')
+        result = self.run_command(self.setup / 'bin/herdr-extension', 'ensure',
+                                  env={**self.env, 'HERDR_STATUS': 'current (v9)'})
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn('empty or unreadable', result.stderr)
+        self.assertNotIn(['integration', 'install', 'pi'], self.herdr_calls())
+
+    def test_concurrent_ensure_installs_once_and_rechecks_under_lock(self):
+        (self.root / 'data/config/extensions/herdr-agent-state.ts').unlink()
+        env = {**self.env, 'HERDR_INSTALL_DELAY': '0.15'}
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            results = list(pool.map(lambda _: self.run_command(self.setup / 'bin/herdr-extension', 'ensure', env=env), range(4)))
+        for result in results:
+            self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.herdr_calls().count(['integration', 'install', 'pi']), 1)
+        self.assertEqual(self.herdr_calls().count(['integration', 'status']), 5)
+
+    def test_conflicting_mode_flags_rejected_without_preparation(self):
+        result, invocation = self.launch(self.project, '--herdr', '--no-herdr')
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIsNone(invocation)
+        self.assertEqual(self.herdr_calls(), [])
 
     def test_standalone_keeps_default_boundary_even_in_herdr_shell(self):
         env = {**self.env, "PI_SESSION_TARGET": "/unexpected"}
@@ -306,9 +459,9 @@ class HerdrLauncherTest(unittest.TestCase):
         self.assertFalse(self.log.exists())
         extension = self.root / "data/config/extensions/herdr-agent-state.ts"
         extension.unlink()
-        result, invocation = self.launch(self.project, "--name", "backend", "--herdr")
+        result, invocation = self.launch(self.project, "--name", "backend", "--herdr", env={**self.env, "HERDR_SKIP_WRITE": "1"})
         self.assertEqual(result.returncode, 2)
-        self.assertIn("official Herdr Pi extension", result.stderr)
+        self.assertIn("no readable, nonempty extension", result.stderr)
         self.assertIsNone(invocation)
 
 

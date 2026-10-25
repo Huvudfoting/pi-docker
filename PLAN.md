@@ -1,539 +1,347 @@
 # Docker-Pi integration with Herdr
 
-## Purpose and agreed scope
+## Current state
 
-Integrate Docker-Pi with Herdr while remaining as close as possible to the
-official Herdr Pi integration. This is a conceptual architecture and feasibility
-plan, not a detailed implementation procedure or test plan.
+The integration is implemented for **local Linux Docker Engine and trusted,
+same-user Herdr sessions**. Eligible interactive launches automatically enable
+Herdr support, prepare the official Pi extension, and print a notice explaining
+the session-wide socket access. `--no-herdr` disables integration; `--herdr`
+requires it. Native restore always requires integration and never falls back.
 
-The initial scope is:
+The user previously reported a successful core host launch-and-restore trial.
+The subsequent automatic detection/extension preparation and container-side
+shutdown changes have local test coverage, but still need host validation.
+Compatibility depends on the deployed Herdr and Pi releases retaining the
+reviewed behavior.
 
-- local Linux with a local Docker Engine and same-user Herdr;
-- the official Herdr Pi extension and Herdr itself remain unchanged;
-- trusted containers, with explicit access to Herdr's full local socket API;
-- interactive Pi operation, including native session restore;
-- unchanged standalone Docker-Pi behavior.
+This file records architecture, implementation constraints, validation, and
+remaining work. Durable user instructions live in
+[the Herdr guide](setup/HERDER_INTEGRATION.md), with general deployment details
+in [SETUP.md](setup/SETUP.md) and [CUSTOMIZATION.md](setup/CUSTOMIZATION.md).
 
-The central design is:
+## Settled design
 
-> Run the unchanged official Herdr Pi extension inside the container over an
-> opt-in socket mount. Identify the host Docker wrapper as Pi with
-> `HERDR_AGENT=pi`. Preserve Herdr's native `pi --session <path>` restoration by
-> giving Herdr-mode sessions a wrapper-recognizable path namespace and retaining
-> a minimal host-side workspace/storage mapping. Do not implement a second
-> lifecycle reporter.
+- Keep Herdr and its official Pi extension unchanged; do not vendor or fork it.
+- Run the official extension inside the container over the selected Unix socket.
+- Identify the host Docker/Compose foreground process with `HERDR_AGENT=pi`.
+- Preserve Herdr's native `pi --session <path>` restore command.
+- Translate managed container session paths into the original host workspace
+  and storage selection using private launch records.
+- Use upstream integration status and installation, not our own hash/version
+  registry or a second lifecycle reporter.
+- Keep the base Compose service free of Herdr context/socket mounts; add the
+  Herdr override only for enabled launches.
+- Preserve ordinary Docker-Pi behavior outside eligible Herdr launches and
+  whenever `--no-herdr` is selected.
 
-The first vertical slice is implemented. The user reported that the short host
-launch-and-restore trial succeeded, validating the core integration end to end
-in their local deployment. Compatibility still depends on the reviewed upstream
-behavior remaining available in the deployed Herdr and Pi versions.
-
-## Documentation and source references
-
-### Herdr
-
-- https://herdr.dev/docs/
-- https://herdr.dev/docs/add-herdr-support/
-- https://herdr.dev/docs/integrations/
-- https://herdr.dev/docs/agents/#vms-and-sandbox-wrappers
-- https://herdr.dev/docs/socket-api/
-- https://github.com/herdrdev/herdr/blob/master/docs/next/website/src/content/docs/socket-api.mdx
-- https://github.com/herdrdev/herdr/blob/master/src/integration/assets/pi/herdr-agent-state.ts
-- https://github.com/herdrdev/herdr/blob/master/src/integration/actions.rs
-- https://github.com/herdrdev/herdr/blob/master/src/integration/targets.rs
-- https://github.com/herdrdev/herdr/blob/master/src/api/schema/agents.rs
-- https://github.com/herdrdev/herdr/blob/master/src/api/schema/panes.rs
-- https://github.com/herdrdev/herdr/blob/master/src/agent_resume.rs
-- https://github.com/herdrdev/herdr/blob/master/src/terminal/state.rs
-- https://github.com/herdrdev/herdr/blob/master/src/platform/linux.rs
-- https://github.com/herdrdev/herdr/blob/master/src/platform/mod.rs
-- https://github.com/herdrdev/herdr/blob/master/src/pane.rs
-- https://github.com/herdrdev/herdr/blob/master/src/app/api/panes.rs
-- https://github.com/herdrdev/herdr/blob/master/src/persist/restore.rs
-
-The review examined Herdr commit
-`5608de0608918aba2f9d501e7793b984a0ca9cfa`, including Pi integration version 9.
-The `master` links above are moving references; findings describe the reviewed
-source, not a guarantee about every released version.
-
-### Pi
-
-The installed Pi documentation was read from:
-
-- `/usr/local/lib/node_modules/@earendil-works/pi-coding-agent/README.md`
-- `/usr/local/lib/node_modules/@earendil-works/pi-coding-agent/docs/extensions.md`
-- `/usr/local/lib/node_modules/@earendil-works/pi-coding-agent/docs/cli.md`
-- `/usr/local/lib/node_modules/@earendil-works/pi-coding-agent/docs/cli-integration.md`
-- `/usr/local/lib/node_modules/@earendil-works/pi-coding-agent/docs/usage.md`
-- `/usr/local/lib/node_modules/@earendil-works/pi-coding-agent/docs/sessions.md`
-- `/usr/local/lib/node_modules/@earendil-works/pi-coding-agent/docs/session-format.md`
-- `/usr/local/lib/node_modules/@earendil-works/pi-coding-agent/docs/configuration.md`
-- `/usr/local/lib/node_modules/@earendil-works/pi-coding-agent/docs/environment-variables.md`
-- `/usr/local/lib/node_modules/@earendil-works/pi-coding-agent/docs/containerization.md`
-- `/usr/local/lib/node_modules/@earendil-works/pi-coding-agent/docs/sdk.md`
-
-The corresponding upstream Pi repository is:
-
-- https://github.com/earendil-works/pi
-
-### Docker-Pi and installed resources
-
-- `README.md`
-- `setup/README.md`
-- `setup/SETUP.md`
-- `setup/AUTHENTICATION.md`
-- `setup/CUSTOMIZATION.md`
-- `setup/AGENTS.md`
-- `setup/bin/pi`
-- `setup/bin/add-herdr-integration`
-- `setup/bin/stop-herdr`
-- `setup/lib/herdr.sh`
-- `setup/pi/compose.yaml`
-- `setup/pi/Dockerfile`
-- `/usr/local/lib/node_modules/@juicesharp/rpiv-ask-user-question/events.ts`
-
-## Findings
-
-### Herdr context, transport, and authority
-
-Herdr supplies pane processes with `HERDR_ENV=1`, `HERDR_PANE_ID`,
-`HERDR_BIN_PATH`, and `HERDR_SOCKET_PATH`. The official Pi extension uses
-newline-delimited JSON directly over the Unix socket; it does not need to
-execute the host Herdr binary inside the container.
-
-Herdr accepts semantic state and session reports through `pane.report_agent`
-and `pane.report_agent_session`. Sequence numbers suppress stale reports.
-Reports must remain bounded and failure-tolerant.
-
-Herdr's official lifecycle authority also interacts with recognized foreground
-process presence. A successful socket write alone does not establish that a
-report was accepted as authoritative. Host-visible wrappers can identify their
-agent through `HERDR_AGENT=<agent>`. This hint must be visible on the host
-foreground process; setting it only inside a container is insufficient.
-
-A reported `resume_argv` takes precedence over native restore, but belongs to
-the reporter holding the pane. An independent companion cannot simply attach a
-resume command to the official extension's authority under another source.
-Sharing its reserved source would introduce sequence and ownership coupling.
-
-### Official Pi extension
-
-`herdr integration install pi` installs the Herdr-managed
-`herdr-agent-state.ts`. Herdr may overwrite that file on reinstall or update.
-
-The reviewed extension:
-
-- uses source `herdr:pi` and visible agent label `pi`;
-- reports only for interactive TUI sessions;
-- connects directly to `HERDR_SOCKET_PATH`;
-- reports `working` on `agent_start` and `idle` on `agent_settled`;
-- receives blocked-state changes through the `herdr:blocked` extension event;
-- obtains session identity from Pi's session manager;
-- prefers an absolute session file path over a session ID;
-- reports session changes without supplying a wrapper-aware `resume_argv`;
-- queues the newest state while delivery is in flight;
-- uses bounded delivery attempts rather than continuous background recovery;
-- does not make Herdr connectivity a reason for Pi to fail;
-- does not register a shutdown/release handler.
-
-Docker-Pi must not fork, modify, vendor, or silently replace this extension.
-Preserving it also means acknowledging its existing cleanup and recovery
-limitations rather than claiming capabilities it does not provide.
-
-### Native restore behavior
-
-For official Pi session references, Herdr constructs:
-
-```text
-pi --session <reported-path-or-id>
-```
-
-Because the extension prefers paths, the normal persisted reference is a
-container-local absolute session filename. Herdr's reviewed native restore code
-passes that reference to the command; it does not require the file to exist on
-the host before invoking `pi`.
-
-The command does not retain Docker-Pi's workspace argument, `--herdr`, or
-launcher `--name`. Constructing a different command inside the launcher does
-not communicate it to Herdr.
-
-The restore entry point must therefore adapt to this native command shape.
-Using `--session-id` instead is not the preferred solution: Pi can create a new
-session if that ID is absent. Restore must reopen the intended existing file,
-not silently substitute a new conversation.
-
-### Pi lifecycle, sessions, and modes
-
-Pi extensions run with the Pi process's OS permissions. The lifecycle provides
-`session_start`, `agent_start`, `agent_settled`, and shutdown hooks.
-`agent_end` is not a final-idle signal because automatic work may continue.
-
-Pi supports persistent sessions through `PI_CODING_AGENT_SESSION_DIR` and
-`--session-dir`. Session switching and branching remain Pi responsibilities.
-The official extension refreshes session identity as those operations occur.
-
-Pi also supports print, JSON, and RPC modes. These are not interactive Herdr
-reporting targets. The host process hint must not indiscriminately identify
-headless operations as interactive Pi agents.
-
-### Current Docker-Pi boundary
-
-The launcher resolves its deployment repository independently of the workspace,
-selects storage deterministically from the canonical workspace and launcher
-name, and runs `docker compose run --rm pi`.
-
-Current mounts include:
-
-| Host resource | Container location |
-|---|---|
-| `data/config/` | `/pi/agent` |
-| `data/sessions/<name>-<path-hash>/` | `/pi/sessions` |
-| Selected project | `/workspace` |
-| Non-secret deployment source | `/opt/pi-docker` (read-only) |
-
-The container retains stdin/TTY, `init: true`, caller UID/GID, dropped
-capabilities, and `no-new-privileges`. No Docker socket is mounted. These
-properties should remain; only the Herdr-specific session mount target needs
-to differ from standalone operation.
-
-## Proposed architecture
-
-### Responsibility boundary
+### Ownership and files
 
 | Responsibility | Owner |
 |---|---|
-| State, session reports, sequencing | Official Herdr Pi extension |
-| Native Pi resume command | Herdr |
-| Host foreground identity and Docker restore routing | Docker-Pi launcher |
-| Workspace/storage selection and mounts | Docker-Pi launcher |
-| Persistent conversations and session switching | Pi |
+| State/session reports, sequencing, delivery | Official Herdr Pi extension |
+| Native Pi resume command and pane lifecycle authority | Herdr |
+| Persistent conversations and interactive session switching | Pi |
+| Mode selection, host identity, workspace/storage, Docker execution | `setup/bin/pi` |
+| Detection, argument/context validation, restore records, local diagnostics | `setup/lib/herdr-launch.sh` |
+| Locked extension install/uninstall/ensure operations | `setup/bin/herdr-extension` |
+| Host executable resolution and upstream status parsing | `setup/lib/herdr-extension.sh` |
+| Container context/socket mounts | `setup/pi/compose.herdr.yaml` |
+| Explicit session-wide shutdown | `setup/bin/stop-herdr` |
 
-The launcher must not report lifecycle state, watch session files for state
-changes, or maintain a parallel Herdr sequence stream.
+The libraries are sourced support code; sourcing creates no deployment state.
+The executable helper is independent of Docker and session-launch logic.
 
-### Initial explicit launch
+## Launch selection and failure policy
 
-A Docker-Pi-specific `--herdr` option opts into integration. The launcher
-requires valid current Herdr context, selects the usual workspace and storage,
-and retains a minimal launch record as described below.
+The launcher parses arguments, resolves workspace/storage, handles diagnostics,
+checks Docker/image availability, selects Herdr mode, prepares integration,
+configures mounts/environment, and executes Docker Compose.
 
-For interactive Herdr operation, it scopes `HERDR_AGENT=pi` to the host-side
-Docker/Compose invocation. The hint is not a global shell setting and is not
-merely a container environment variable.
+| Invocation or condition | Behavior |
+|---|---|
+| Eligible interactive launch with valid local Herdr context | Ensure the official extension, print access notice, launch with Herdr |
+| No Herdr context | Ordinary launch without integration or a warning |
+| Partial/invalid detected context in auto mode | Warn; launch without integration |
+| Upstream preparation failure in auto mode | Warn that reporting/native restore are unavailable; launch without integration |
+| `--herdr` with invalid context, incompatible arguments, or preparation failure | Abort |
+| `--no-herdr` | No detection, installation/update, or socket exposure |
+| Native managed-path restore | Validate record, workspace, session, context, and integration; abort on failure |
+| Headless, maintenance, or integration-incompatible invocation in auto mode | Ordinary launch; do not install/update |
+| Launcher help or `--herdr-status` | No installation or Docker invocation |
 
-Inside the container, the launcher supplies:
+Auto eligibility requires Linux, terminal stdin/stdout, `HERDR_ENV=1`, a nonempty
+`HERDR_PANE_ID`, and an absolute `HERDR_SOCKET_PATH` selecting an existing Unix
+socket owned by the current user. These are local checks, not proof of live
+connectivity or pane authority. Never manufacture pane context or probe the
+control API merely to detect it.
 
-- `HERDR_ENV=1`;
-- the current `HERDR_PANE_ID`;
-- `HERDR_SOCKET_PATH` pointing to a fixed container endpoint such as
-  `/run/herdr/herdr.sock`;
-- a bind mount of the exact socket selected by the current host Herdr context.
+Explicit `--herdr` and `--no-herdr` are mutually exclusive launcher options,
+before Pi arguments. A shell tool's non-TTY status inside a container does not
+establish whether the host launch was in Herdr. In-container detection uses
+its forwarded Herdr environment and mounted socket, not `PI_*` variables alone.
 
-There is no need to forward `HERDR_BIN_PATH`: the extension uses direct IPC,
-and a host executable path must not be assumed executable inside the container.
+Herdr mode permits `--continue`/`--resume` and Pi's interactive session commands.
+It rejects explicit CLI session/fork paths except the exact native restore
+invocation, custom session directories, ephemeral sessions, disabled extension
+discovery, headless modes, and maintenance commands. Other original CLI flags
+are not recorded for replay.
 
-### Compose boundary
+## Official extension preparation
 
-Prefer a separate Herdr Compose override, leaving the default service's
-standalone behavior unchanged. The Herdr additions provide context forwarding,
-the socket mount, and the Herdr-specific session mount target and environment.
+The managed file is `data/config/extensions/herdr-agent-state.ts`, discovered
+normally by Pi at `/pi/agent/extensions/`. It is deliberately exempt from the
+general policy of baking downloaded extensions into the image. Do not load it
+a second time explicitly. Without Herdr context, it remains inactive.
 
-The architectural requirements are:
+`setup/bin/herdr-extension` supports:
 
-- no Herdr socket mount in standalone mode;
-- no silent creation of a missing socket source;
-- only the selected session directory is exposed, not the entire host session
-  store;
-- the session-directory environment matches the Herdr-specific mount target;
-- interactive transport, security options, and disposable-container lifecycle
-  remain intact.
+- `install` (also the default action): force official installation/update;
+- `uninstall`: remove only the managed extension;
+- `ensure`: check upstream status and install only when needed.
 
-The precise YAML is an implementation detail, not an unresolved architecture
-choice.
+The helper resolves its deployment through symlinks, independently of the
+working directory. It selects executable `HERDR_BIN_PATH` when supplied,
+otherwise `herdr` on `PATH`. A stale explicit binary path is an error, not a
+reason to silently select a different installation. It scopes
+`PI_CODING_AGENT_DIR=<deployment>/data/config` to upstream CLI invocations,
+without changing the caller's environment or host default Pi configuration.
+Herdr itself is never downloaded/upgraded. Manual preparation needs neither
+Docker nor an active pane; changed extensions require a new Pi process/container.
+Uninstall preserves credentials, sessions, and launch records; `--no-herdr`
+prevents automatic reinstallation in a Herdr pane.
 
-### Extension installation and discovery
+### Status and verification
 
-Herdr remains the installation and update authority. On the host, its
-`PI_CODING_AGENT_DIR` must explicitly select this deployment's `data/config/`
-directory. A normal host install targeting `~/.pi/agent` does not automatically
-install into Docker-Pi's configuration.
+Upstream embeds the official extension in its executable. The reviewed
+`integration status` CLI has no JSON option; our parser accepts only one
+recognized Pi status line for the exact deployment destination. Unknown,
+malformed, duplicate, or failed status output is a preparation failure.
 
-That host directory maps to `/pi/agent`, where Pi's normal user-extension
-discovery loads the managed file. Explicit duplicate loading is unnecessary.
-Without Herdr context, the discovered extension remains inactive; standalone
-operation must neither require nor activate it.
+- **Current:** leave the extension untouched, checking it is readable/nonempty.
+- **Missing/outdated:** invoke the same binary's `integration install pi`,
+  verify a readable/nonempty file, then require current upstream status.
 
-This is a deliberate exception to `setup/CUSTOMIZATION.md`'s general rule that
-third-party extensions are npm packages baked into the image. This particular
-file is installed and maintained by Herdr, not Docker-Pi. The deployment policy
-should explain that exception when integration is implemented.
+Upstream considers an installed integration version at least as new as expected
+current. This is not exact-content matching and does not detect arbitrary local
+edits. We follow that compatibility policy rather than maintain a hash registry.
 
-## Session and restore design
+### Concurrency and write boundary
 
-### Recognizable container session namespace
+Host `flock` (util-linux) serializes status/install/verification and manual
+helper operations, with a 30-second wait on
+`data/config/.herdr-integration.lock`. Check status after acquiring the lock,
+so concurrent launches do not redundantly install. Keep the lock file: unlinking
+it could give concurrent processes different locks. Preserve permissions on
+existing shared configuration and leave unrelated files unchanged.
 
-For Herdr mode, expose the selected host session directory at a distinctive
-container path, conceptually:
+The upstream installer writes directly to its destination, not atomically.
+Our lock coordinates helper invocations, not direct upstream CLI commands or
+all readers of shared configuration. Atomic staging/publication would require
+a separate implementation change; it is not provided by the current installer.
 
-```text
-/pi/herdr-sessions/<storage-key>/<session-file>.jsonl
-```
+## Container transport and process identity
 
-The spelling is illustrative. The namespace must be stable across containers,
-identify the storage selection unambiguously, and distinguish different
-workspace/name selections. The underlying host directory remains
-`data/sessions/<name>-<path-hash>/`; standalone operation retains `/pi/sessions`.
-
-The official extension reports the actual file under this namespace. It is a
-container path understood by the Docker-Pi restore entry point, not a claim
-that the same path exists on the host. This relies on the reviewed Herdr native
-Pi restore behavior of passing the path to `pi` without resolving it itself.
-
-Session operations within the selected storage continue to work normally.
-When `/new`, `/resume`, `/fork`, or `/clone` changes the conversation, the
-extension reports the new filename under the same storage namespace.
-
-### Minimal persistent launch record
-
-A host-side record associates the storage key with:
-
-- the canonical host workspace;
-- the launcher name/storage selection;
-- the fact that this selection was explicitly enabled for Herdr.
-
-Keep it in private deployment state under `data/`. It describes a launch
-selection, not agent activity, and does not require a watcher or reporter.
-The key-to-selection association must remain unambiguous across launches.
-
-This mapping is needed because the workspace hash is not reversible, Pi sees
-`/workspace`, and Herdr's restored shell directory may differ from the project
-explicitly selected at initial launch.
-
-Do not persist pane IDs or socket endpoints in the record. Restored containers
-must use the fresh Herdr context, not reconnect to a previous pane or server.
-
-The initial restore promise covers workspace, storage selection, and the exact
-conversation. It does not promise arbitrary replay of every original CLI flag.
-User-selected session storage overrides must have an explicit compatibility
-policy rather than silently escaping this managed namespace. Ephemeral
-`--no-session` runs cannot provide native conversation restore.
-
-### Native restore entry point
-
-The restore flow is:
-
-```text
-Herdr restarts and supplies fresh pane context
-  -> pi --session <managed-container-session-path>
-    -> host launcher recognizes the Docker-Pi namespace
-      -> launch record recovers workspace and storage selection
-        -> launcher restores Herdr-mode mounts and host process hint
-          -> Pi opens the exact existing session file
-```
-
-The plain host command `pi` must resolve to this deployment's launcher on the
-restored shell's `PATH`. No custom `resume_argv` or companion session reporter
-is needed.
-
-The literal `--herdr` flag does not survive native restore. Re-entry is instead
-allowed only when a managed namespace reference resolves to an existing
-Herdr-enabled launch record and valid current Herdr context is present. This is
-continuation of an earlier explicit opt-in, not automatic integration whenever
-`HERDR_ENV=1` is inherited.
-
-Unknown, stale, missing, or out-of-scope references must fail clearly rather
-than selecting another workspace, mounting an arbitrary path, or creating a
-replacement conversation. Ordinary Pi arguments remain ordinary unless they
-match this narrowly defined managed restore entry point.
-
-## Blocked-state coverage
-
-The official extension consumes `herdr:blocked`. The installed
-`@juicesharp/rpiv-ask-user-question` exposes `rpiv:ask-user:blocked`, so its
-question dialogs do not automatically reach the official reporter through that
-event contract.
-
-Use a small local event adapter for the known question-extension contract if
-blocked reporting for those dialogs is required. It should translate balanced
-active/inactive events into `herdr:blocked`, not issue Herdr socket requests,
-claim authority, or own sequence numbers. Other UI extensions must likewise
-participate in the event contract to provide blocked-state coverage.
-
-Do not describe blocked reporting as universal simply because the socket is
-mounted. State reporting remains owned by the official extension.
-
-## TTY, signals, cleanup, and connectivity
-
-Preserve the existing interactive process chain:
+The process chain remains:
 
 ```text
 Herdr pane PTY
   -> host pi launcher
-    -> docker compose (host-visible HERDR_AGENT=pi)
+    -> docker compose run --rm (HERDR_AGENT=pi)
       -> container PTY
         -> Pi TUI and official Herdr extension
 ```
 
-Do not pipe Pi's stdin/stdout, force print mode, or replace the existing
-`docker compose run --rm` lifecycle. Preserve `init: true`, signal and
-exit-status behavior, and Compose's disposable-container cleanup.
+The host hint matters because Herdr combines semantic reports with recognized
+foreground process presence. Setting the hint only inside the container would
+not identify the host wrapper. Ordinary launches clear the wrapper hint.
 
-The reviewed official extension has no explicit release handler. Preserving
-upstream behavior means relying on Herdr's process-exit/idle-shell detection
-for normal as well as unexpected exit cleanup. The host process identity hint
-helps Herdr associate that lifetime with Pi. Do not claim explicit release or
-add a second lifecycle owner merely to imitate the generic integration guide.
+The override forwards `HERDR_ENV=1`, the current `HERDR_PANE_ID`, and
+`HERDR_SOCKET_PATH=/run/herdr/herdr.sock`, binding the exact current host socket
+there. Missing bind sources must fail rather than be created. The host
+`HERDR_BIN_PATH` is not needed inside the container: reporting uses direct IPC.
 
-Connectivity failures must not terminate Pi, but transparent recovery is not
-promised:
+Retain interactive stdin/TTY, `init: true`, caller UID/GID, dropped capabilities,
+`no-new-privileges`, signals, exit-status propagation, and disposable-container
+cleanup. There is no Docker socket mount or background supervisor.
 
-- delivery attempts are bounded per report, not continuous reconciliation;
-- a single-file socket bind mount can retain an old socket inode if the host
-  unlinks and recreates its endpoint;
-- a fresh container launch binds the current endpoint, but an existing
-  container is not guaranteed to recover automatically after replacement.
+## Sessions and native restore
 
-The initial guarantee is failure tolerance, not uninterrupted reporting across
-every server/socket lifecycle.
+The host session directory remains `data/sessions/<name>-<path-hash>/`, selected
+from canonical workspace and launcher name. Standalone containers mount it at
+`/pi/sessions`; Herdr mode uses `/pi/herdr-sessions/<storage-key>`. Only the
+selected storage is mounted, not the full host session store.
 
-## Trust and security consequences
+The storage key is SHA-256 of the canonical workspace, a NUL separator, and the
+launcher name. A versioned, NUL-delimited record at
+`data/herdr-launches/<storage-key>.record` maps it to workspace and name. Records
+are private data, never sourced shell code. Publication is atomic; conflicting
+records are rejected. They contain no pane IDs or socket paths. Back them up
+alongside sessions.
 
-The accepted initial trust model permits the container to access Herdr's full
-local control plane. A pane ID is context, not a permission boundary: extensions
-and shell tools can use the socket to control unrelated panes and other Herdr
-resources.
+The official extension prefers an absolute session file path over an ID and
+reports changes when Pi switches/branches conversations. Herdr passes that
+reference to its native command without requiring the file to exist on the host:
 
-Accordingly:
+```text
+pi --session /pi/herdr-sessions/<storage-key>/<session-file>.jsonl
+  -> recognize the managed namespace and exact invocation shape
+  -> recover canonical workspace/name from a valid owned launch record
+  -> validate the existing session stays within that storage
+  -> use the restored pane's fresh context and ensure integration
+  -> recreate mounts/host hint and open the exact conversation
+```
 
-- expose the socket only on initial explicit Herdr launch or validated native
-  restore of an earlier opt-in;
-- use exactly the current context's socket and verify the mount source is a
-  socket, not an arbitrary host resource;
-- keep the ordinary Compose service free of the Herdr socket;
-- keep managed restore references constrained to known storage selections;
-- retain existing UID/GID, capability, and mount restrictions;
-- document that Docker-Pi provides process/filesystem isolation, not a hardened
-  sandbox.
+The host `pi` on the restored shell's `PATH` must resolve to this launcher.
+Missing/invalid records, moved workspaces, missing session files, path escapes,
+and symlink escapes fail rather than select arbitrary mounts or create another
+conversation. New conversations must persist a message before they can restore.
 
-A scoped proxy would be a separate future security architecture. It is not
-required by the trusted-container scope and should not complicate the initial
-design. Docker Desktop/macOS, remote Docker daemons, and Windows named pipes
-also require separate transport designs and are outside this plan.
+The restore promise covers workspace, storage selection, and conversation—not
+all original flags. Neither a custom `resume_argv` nor a companion reporter is
+needed. A managed restore reference is authoritative routing input only after
+validation, not permission to bypass current context/integration checks.
 
-## Expected behavior
+## Reporting, cleanup, and socket authority
 
-| Invocation or condition | Expected behavior |
-|---|---|
-| Standalone `pi`, including inside a Herdr shell without opt-in | Existing Docker-Pi behavior; no Herdr socket exposure |
-| `pi --herdr` without valid Herdr context/socket | Refuse the explicit integration path |
-| Interactive `pi --herdr` in a Herdr pane | Host identifies wrapper as Pi; official extension reports state/session |
-| Native `pi --session <managed-path>` restore with valid record/context | Recover workspace/storage, enter Herdr mode, reopen exact conversation |
-| Invalid or stale managed restore reference | Clear failure; no fallback conversation or arbitrary mounts |
-| Discovered managed extension outside Herdr mode | Inactive and not required for standalone use |
-| Headless Pi operation | No official TUI reporting or indiscriminate interactive host hint |
-| Question extension's questionnaire UI | Blocked-event adapter is deferred; blocked reporting is not yet integrated |
-| Temporary connectivity failure | Pi continues; delivery remains best-effort |
-| Host replaces the socket inode | Existing mount may remain stale; automatic recovery not guaranteed |
-| Pi/container exits | Herdr's process-exit/idle-shell cleanup clears authority |
+The reviewed official extension uses newline-delimited JSON over the socket,
+source `herdr:pi`, and agent label `pi`. It reports `working` on `agent_start`,
+`idle` on `agent_settled`, session identity through Pi's session manager, and
+blocked-state changes through `herdr:blocked`. `agent_end` is not final idle.
+It queues the newest pending state and uses bounded delivery attempts rather
+than continuous reconciliation. Connectivity/reporting failure does not kill Pi.
 
-## Architectural decisions and remaining boundaries
+Herdr receives state/session reports through `pane.report_agent` and
+`pane.report_agent_session`, with sequence numbers suppressing stale reports.
+A reported `resume_argv` belongs to the reporter's authority; an independent
+reporter must not share its reserved source or sequence stream.
 
-The conceptual decisions are settled:
+The extension has no explicit shutdown/release handler. Exit cleanup follows
+Herdr's process-exit/idle-shell detection, not an added lifecycle owner. A
+single-file bind mount can retain an old inode after socket replacement;
+automatic recovery is not guaranteed. New containers bind the current endpoint.
 
-- unchanged official extension, direct socket transport, no parallel reporter;
-- host-side `HERDR_AGENT=pi` for interactive integration;
-- native Herdr restore command retained;
-- managed session-path namespace plus minimal persistent host launch record;
-- standard extension discovery with host installation targeting `data/config`;
-- separate Herdr Compose override;
-- local Linux and full-socket trusted-container scope.
+The socket exposes the full local control plane, including other panes. Pane
+IDs are context, not access restrictions. Auto activation changes the former
+explicit-opt-in-only policy: every enabled launch must print the access notice
+and identify `--no-herdr` as the opt-out. This is trusted-container integration,
+not a hardened sandbox. Retain existing mount/security boundaries and separate
+Git worktrees for concurrent writing agents.
 
-The first vertical slice implements `/pi/herdr-sessions/<key>`, where the key
-is SHA-256 of the canonical workspace, a NUL separator, and the launcher name.
-Versioned, NUL-delimited launch records live at
-`data/herdr-launches/<key>.record`; the launcher reads them as data, never shell
-code. Publication is atomic, and conflicting records are not overwritten.
+### Explicit shutdown
 
-This slice accepts only the exact native managed-path restore invocation.
-Initial Herdr launches can use `--continue` or `--resume`, but reject explicit
-CLI session/fork paths, session-directory overrides, ephemeral sessions,
-disabled extension discovery, and headless/maintenance invocations. Pi's
-interactive session operations remain available. Other CLI flags are not
-recorded for replay. The blocked-event adapter remains deferred.
+`setup/bin/stop-herdr` is mounted at `/opt/pi-docker/bin/stop-herdr`. It uses
+Node's built-in socket client to send one `server.stop` request to the connected
+session. It requires Herdr context and a mounted socket, but no host Herdr CLI,
+image rebuild, `--yes` flag, or confirmation prompt.
 
-### Usability and installation support
+This stops all panes/processes, not just Pi, and is distinct from detach. Agents
+must act only on an explicit user request to stop the entire session; clarify
+ambiguous exit/detach requests. A bounded acknowledgement wait can end after
+the container is terminated; lost acknowledgement is ambiguous. Never retry
+automatically. `--help` does not contact Herdr.
 
-The launcher provides `--help` without Docker and a read-only `--herdr-status`
-for a selected workspace/name. Diagnostics report only local path, extension,
-record-presence, pane/socket, Docker-CLI-presence, and restore-PATH checks.
-They do not read credentials/session contents, inspect record contents, mutate
-state, contact Herdr, or invoke Docker. A successful report is not a guarantee
-of live connectivity, writable storage, image availability, or restore readiness.
-TTY status is informational so diagnostic output can be redirected.
+## Diagnostics and validation
 
-The host helper `setup/bin/add-herdr-integration [install|uninstall]` resolves its deployment
-location, including symlinks, and sets `PI_CODING_AGENT_DIR` only for its Herdr
-CLI invocation. It delegates to the official installer, verifies the resulting
-managed file's presence/removal, and preserves credentials, sessions, and launch
-records. Installation defaults to install/update, requires an existing host
-Herdr binary, and needs no Docker daemon or active pane. No fake pane context
-or additional reporter is introduced.
+`pi --help` is available without Docker. `--herdr-status` reports the selected
+workspace/storage, expected container session target, extension/record presence,
+pane/socket checks, Docker CLI presence, and restore launcher resolution.
+It reads no credentials, conversation contents, or record contents; changes
+nothing; and invokes neither Docker nor Herdr. It does not check integration
+versions. TTY status is informational, allowing redirected diagnostics.
+Exit codes are `0` for prerequisites present, `1` for missing prerequisites,
+and `2` for invalid arguments/selection. Output includes local paths and pane ID.
 
-The launcher is organized around a short `main` flow: parse arguments, resolve
-workspace/storage, optionally report diagnostics, check Docker, prepare Herdr
-when requested, prepare the container environment, and execute Pi. Herdr-specific
-restore validation, record publication, and diagnostics live in
-`setup/lib/herdr.sh`. Sourcing that helper creates no persistent state. Launch
-records, storage layout, and native restore arguments are unchanged by this
-refactoring. Launcher help uses repository-relative commands/documentation
-paths rather than deployment-specific absolute paths.
+Successful local diagnostics do not establish live connectivity, writable
+storage, image/daemon availability, version compatibility, or restore readiness.
+A missing launch record is normal before the first enabled launch.
 
-### Explicit container-side shutdown helper
+### Validation completed
 
-`setup/bin/stop-herdr`, available inside the container at
-`/opt/pi-docker/bin/stop-herdr`, sends one `server.stop` request through the
-current mounted socket. It requires `--yes` and Herdr pane context, uses Node's
-built-in socket client with a bounded response wait, and does not require the
-host Herdr binary or an image rebuild. This is an explicit control command,
-not an additional state reporter or automatic lifecycle hook.
+- The user reported the earlier core host launch-and-restore trial succeeded:
+  wrapper identification, official state/session reporting, and restoration to
+  the same workspace/storage/conversation worked in that deployment.
+- The local suite has 25 fake-Docker/fake-Herdr and temporary-socket tests. It
+  covers automatic current/missing/outdated preparation, unchanged current
+  extensions, executable/configuration targeting, malformed status, opt-out,
+  ineligible invocations, strict restore failures, auto fallback, read-only
+  diagnostics, concurrent installation once, and shutdown request/response and
+  ambiguous-outcome handling without retries.
+- Bash syntax and scoped whitespace checks passed during implementation.
 
-It stops the entire connected Herdr session, including other panes and
-processes. Detach and exiting only Pi remain separate actions. The container
-may terminate before an acknowledgement is displayed; a lost acknowledgement
-is reported as ambiguous, and the helper never retries automatically. Help or
-an invocation without confirmation never contacts Herdr.
+Run the local suite without contacting a real Herdr server:
 
-### Validation status
+```bash
+python3 -m unittest discover -s tests -p 'test_*.py'
+```
 
-The user completed the short host trial documented in `setup/README.md` and
-reported that it worked successfully. This provides end-to-end confirmation of
-the core launch-and-restore path in that deployment:
+These tests do not replace host validation of automatic preparation and shutdown.
+The prior core trial does not establish those subsequent changes or arbitrary
+Herdr/Pi version compatibility.
 
-- interactive Docker-Pi launch in Herdr with the official extension;
-- host wrapper identification and socket-based state/session reporting;
-- native restore into the original workspace, storage selection, and conversation.
+### Host validation still needed
 
-The baseline's local Bash syntax and five focused fake-Docker launcher checks
-also passed. The usability/installer and readability passes expand this to eleven focused checks,
-including read-only diagnostics, repository-relative help, verbatim Pi argument
-forwarding, temporary-record cleanup, and a fake-Herdr installer exercised from
-a different directory and through a symlink. These checks cover local routing,
-failure handling, and correct configuration targeting, not live Herdr behavior.
-The successful host trial validates the core launch/restore path; the new
-installer has not yet been exercised against the real host Herdr binary.
-Four additional shutdown-helper checks use temporary Unix sockets to cover
-confirmation/context guards, the stop request and acknowledgement, rejected or
-invalid responses, and lost acknowledgement without retry. They do not stop a
-real Herdr server; the shutdown helper still needs a user-run host trial.
+Use a disposable named session so restart/shutdown cannot affect real work:
 
-Treat this working slice as the baseline. The questionnaire blocked-event
-adapter remains deferred at the user's request. Socket-inode replacement
-recovery, broader CLI-option replay, and cross-platform support remain outside
-the validated scope. The host trial does not establish those capabilities or
-guarantee compatibility with other Herdr/Pi versions. Broader launch-option
-compatibility remains a bounded follow-up, not a reason to introduce a custom
-lifecycle integration.
+1. Start `herdr --session pi-docker-trial` on the host.
+2. In a pane, run `pi /absolute/path/to/project --name herdr-trial`.
+   Verify automatic integration and its access notice. Send a message to persist
+   the conversation; observe working/idle reporting using `herdr agent list`
+   from another pane.
+3. In another host terminal, run `herdr session stop pi-docker-trial`, then
+   `herdr --session pi-docker-trial`.
+4. Confirm the same project/conversation returns; `/session` should show the
+   managed session path.
+5. Exercise missing/outdated/current extension preparation and `--no-herdr`
+   against the actual host release, using disposable deployment configuration
+   where needed to avoid changing shared production state.
+6. In the disposable connected session, test the container-side shutdown helper
+   and confirm it stops that entire session, not an unrelated default session.
 
-The resulting integration follows official Pi reporting and native Herdr
-restore while confining Docker-specific adaptation to host process identity,
-mounts, and the launcher's restore entry point.
+## Remaining work and non-goals
+
+- **Questionnaire blocked-state adapter — deferred at the user's request.**
+  `@juicesharp/rpiv-ask-user-question` emits `rpiv:ask-user:blocked`, whereas the
+  official reporter consumes `herdr:blocked`. If implemented, bridge balanced
+  active/inactive events locally; do not add a second socket reporter, authority
+  source, or sequence owner. Other UI extensions need their own event coverage.
+- **Host validation:** complete the automatic preparation and shutdown checks
+  above before claiming those paths are verified end to end.
+- **Socket replacement recovery:** best-effort reporting is implemented;
+  continuous recovery across inode replacement is not.
+- **Broader launch-option replay:** only workspace/storage/conversation restore
+  is promised. Additional flags need an explicit compatibility policy.
+- **Atomic extension publication:** not implemented; helper locking is the
+  present concurrency boundary.
+- **Additional platforms/transports:** Docker Desktop/macOS, remote Docker,
+  Windows named pipes, and a scoped control proxy require separate designs.
+
+Do not describe blocked reporting as universal, socket recovery as transparent,
+or the full socket as pane-scoped. None of these follow merely from mounting
+it or passing local diagnostics.
+
+## Review references
+
+The original core review recorded Herdr commit
+`5608de0608918aba2f9d501e7793b984a0ca9cfa` and Pi integration version 9.
+Automatic preparation was subsequently checked against upstream installer/status
+source. The links below track `master`, not necessarily the deployed release;
+recheck contracts when upgrading rather than assume every release matches.
+
+- [Herdr integration documentation](https://herdr.dev/docs/integrations/)
+- [Wrapper process identity](https://herdr.dev/docs/agents/#vms-and-sandbox-wrappers)
+- [Socket API](https://herdr.dev/docs/socket-api/)
+- [Official Pi extension](https://github.com/herdrdev/herdr/blob/master/src/integration/assets/pi/herdr-agent-state.ts)
+- [Embedded assets and expected versions](https://github.com/herdrdev/herdr/blob/master/src/integration/mod.rs)
+- [Integration CLI/status output](https://github.com/herdrdev/herdr/blob/master/src/cli/integration.rs)
+- [Status/version interpretation](https://github.com/herdrdev/herdr/blob/master/src/integration/registry.rs)
+- [Installer actions](https://github.com/herdrdev/herdr/blob/master/src/integration/actions.rs)
+- [Extension installation](https://github.com/herdrdev/herdr/blob/master/src/integration/targets.rs)
+- [Configuration directory resolution](https://github.com/herdrdev/herdr/blob/master/src/integration/env.rs)
+- [Native agent resume](https://github.com/herdrdev/herdr/blob/master/src/agent_resume.rs)
+- [Persisted restore](https://github.com/herdrdev/herdr/blob/master/src/persist/restore.rs)
+- [Pi upstream repository](https://github.com/earendil-works/pi)
+
+Pi lifecycle/session findings came from installed version-matched documentation
+under `/usr/local/lib/node_modules/@earendil-works/pi-coding-agent/` and the
+installed questionnaire extension's event contract. Consult the installed docs
+for current APIs rather than treating this design record as an API reference.

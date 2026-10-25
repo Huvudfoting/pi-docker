@@ -23,7 +23,8 @@ Read only the relevant mounted guide; do not search `/workspace` for these docs:
   `HERDR_SOCKET_PATH`: expect `HERDR_ENV=1`, a nonempty pane ID, and an existing
   Unix socket. `PI_*` variables and a shell tool's non-TTY status do not establish
   whether Pi is in a Herdr pane. Missing context does not prove the host terminal
-  is outside Herdr; ordinary launches intentionally do not expose the integration.
+  is outside Herdr; `--no-herdr`, ineligible invocations, or auto preparation
+  failures intentionally leave the integration unexposed.
 - Never manufacture pane context or probe the control API just to identify it.
   Local context checks do not prove live connectivity or reporting readiness.
 - The mounted socket controls the entire connected Herdr session, including
@@ -34,8 +35,9 @@ Read only the relevant mounted guide; do not search `/workspace` for these docs:
 When explicitly asked to stop the entire connected Herdr session, use
 `/opt/pi-docker/bin/stop-herdr` through the shell tool. This stops all panes
 and processes, not just Pi; clarify first if the user only wants to exit Pi or
-detach. The helper requires a `--herdr` launch. It may terminate this container
-before acknowledgement; do not automatically retry an ambiguous result.
+detach. The helper requires a Herdr-enabled launch (auto or `--herdr`). It may
+terminate this container before acknowledgement; do not automatically retry an
+ambiguous result.
 
 ## GitHub
 Use `gh` via bash for GitHub operations.

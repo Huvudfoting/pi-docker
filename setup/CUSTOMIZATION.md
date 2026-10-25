@@ -31,7 +31,9 @@ automatic Python downloads; use the image-provided interpreter.
 The official `herdr-agent-state.ts` is managed by host Herdr in
 `data/config/extensions/` and discovered by Pi at `/pi/agent/extensions/`.
 It is not an image-managed npm package and must not be vendored or modified
-here; it remains inactive without Herdr context. See
+here; it remains inactive without Herdr context. Eligible interactive launches
+inside Herdr automatically check upstream status and install/update when needed.
+Use `--no-herdr` to prevent that preparation and socket exposure. See
 [Herdr installation and updates](HERDER_INTEGRATION.md#scope-and-installation)
 for the host installer, update, and removal workflow.
 
@@ -64,7 +66,10 @@ Extension folders accept `.ts`/`.js` files or subdirectories with `index.ts` or
 `setup/bin/pi` keeps the launch flow explicit: parse arguments, select the
 workspace/storage, optionally show diagnostics, configure Docker/Herdr, then
 execute Pi. Herdr-specific restore records, validation, and diagnostics are
-isolated in `setup/lib/herdr.sh`; sourcing it does not create deployment state.
+isolated in `setup/lib/herdr-launch.sh`; host executable resolution and strict upstream
+status parsing live in `setup/lib/herdr-extension.sh`. Sourcing these helpers
+does not create deployment state. `setup/bin/herdr-extension ensure`
+serializes integration status/install/verification before enabled launches.
 Keep argument forwarding and the final `exec` visible in the launcher rather
 than adding a background supervisor or a second lifecycle reporter.
 

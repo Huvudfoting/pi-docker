@@ -9,38 +9,42 @@ root="$(dirname -- "$setup")"
 fail() { printf 'pi-docker: %s\n' "$*" >&2; exit 2; }
 
 # Herdr details live separately; sourcing the helper creates no persistent state.
-source "$setup/lib/herdr.sh"
+source "$setup/lib/herdr-launch.sh"
 
 show_help() {
-  printf '%s\n' 'Usage: pi [workspace] [--name NAME] [--herdr] [-- PI_ARGS...]
+  printf '%s\n' 'Usage: pi [workspace] [--name NAME] [--herdr|--no-herdr] [-- PI_ARGS...]
        pi [workspace] [--name NAME] --herdr-status
        pi --session <managed-session-path>  (native Herdr restore)
 
 Docker-Pi launcher options (before Pi arguments):
   --name NAME       Select session storage, not the conversation title.
-  --herdr           Opt into Herdr reporting and native restore (local Linux).
+  --herdr           Require Herdr reporting and native restore (local Linux).
+  --no-herdr        Disable detection, installation, and Herdr socket exposure.
   --herdr-status    Read-only local diagnostics; no Docker/Herdr API calls.
   --help, -h        Show launcher help without starting Docker.
   --               Forward remaining arguments to Pi; e.g. pi -- --help.
 
 Workspace defaults to the current directory; an explicit workspace comes first.
-Herdr mode requires a live Herdr pane, terminal stdin/stdout, its same-user Unix
-socket, and the official extension. It grants access to the full Herdr API.
+Interactive launches auto-enable Herdr in a detected local Linux Herdr pane.
+Herdr mode requires terminal stdin/stdout and a same-user Unix socket; the
+launcher ensures the official extension is current using host Herdr. It grants
+access to the full Herdr API. Auto preparation failures warn and launch without
+integration; explicit --herdr and native restore fail instead.
 Use --continue or --resume for existing sessions. Herdr mode rejects headless
 modes, custom session paths/directories, --no-session, and --no-extensions.
 Original CLI flags are not replayed on restore. Questionnaire blocked events
 are not yet bridged; socket replacement recovery is not guaranteed.
 
 Install/update the official extension on the host, from the docker-pi repo root:
-  setup/bin/add-herdr-integration install
-Usage and host trial: setup/HERDER_INTEGRATION.md'
+  setup/bin/herdr-extension install
+Usage: setup/HERDER_INTEGRATION.md'
 }
 
 parse_arguments() {
   # Native restore has no workspace argument: recover it from the launch record.
   if herdr_is_restore_request "$@"; then
     [[ $# == 2 ]] || fail "Managed restore accepts only: pi --session <managed-path>"
-    herdr=1
+    herdr_mode=required
     herdr_load_restore "$2"
     pi_args=("$@")
     return
@@ -56,7 +60,10 @@ parse_arguments() {
         [[ $# -ge 2 ]] || fail "--name needs a value"
         name="$2"
         shift 2 ;;
-      --herdr) herdr=1; shift ;;
+      --herdr|--no-herdr)
+        [[ "$herdr_mode" == auto ]] || fail "Choose only one of --herdr and --no-herdr"
+        if [[ "$1" == --herdr ]]; then herdr_mode=required; else herdr_mode=disabled; fi
+        shift ;;
       --herdr-status) diagnose=1; shift ;;
       --help|-h) show_help; exit 0 ;;
       --) shift; break ;;
@@ -104,7 +111,7 @@ prepare_environment() {
   export PI_GID="$(id -g)"
   export OLLAMA_NETWORK="${OLLAMA_NETWORK:-pi-ollama}"
   # This identifies only the host-side interactive wrapper, not the user's shell.
-  if ((herdr)); then export HERDR_AGENT=pi; fi
+  if ((herdr)); then export HERDR_AGENT=pi; else unset HERDR_AGENT; fi
 }
 
 launch_pi() {
@@ -123,6 +130,7 @@ main() {
   workspace="$PWD"
   name=""
   herdr=0
+  herdr_mode=auto
   diagnose=0
   restore_ref=""
   restore_filename=""
@@ -141,9 +149,24 @@ main() {
   require_docker
   PI_SESSION_TARGET=/pi/sessions
   compose_files=(-f "$setup/pi/compose.yaml")
+  herdr_select_mode "${pi_args[@]}"
   if ((herdr)); then
-    herdr_prepare "${pi_args[@]}"
-    compose_files+=(-f "$setup/pi/compose.herdr.yaml")
+    herdr_validate_context
+    if [[ -n "$restore_ref" ]]; then
+      herdr_validate_session_file
+    else
+      herdr_validate_arguments "${pi_args[@]}"
+    fi
+    if "$setup/bin/herdr-extension" ensure >&2; then
+      herdr_prepare
+      compose_files+=(-f "$setup/pi/compose.herdr.yaml")
+      printf 'pi-docker: Herdr integration enabled. The container can control the connected\n  Herdr session, including other panes. Use --no-herdr to disable.\n' >&2
+    elif [[ "$herdr_mode" == auto ]]; then
+      herdr=0
+      herdr_warn_fallback
+    else
+      fail "Could not prepare official Herdr integration; refusing required launch/restore."
+    fi
   fi
   prepare_environment
   launch_pi

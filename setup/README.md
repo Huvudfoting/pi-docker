@@ -7,11 +7,12 @@ start another model server.
 - [Initial installation](SETUP.md)
 - [OpenAI/provider login and GitHub authentication](AUTHENTICATION.md)
 - [Extensions, resource paths, and maintenance](CUSTOMIZATION.md)
-- [Optional Herdr integration, diagnostics, and host trial](HERDER_INTEGRATION.md)
+- [Herdr integration and diagnostics](HERDER_INTEGRATION.md)
 
 ## Launching
 
-Build the image once before launching Pi:
+After [initial setup](SETUP.md), build the image on the host from this
+deployment's repository root:
 
 ```bash
 docker build -t pi-agent:latest ./setup/pi
@@ -28,10 +29,14 @@ missing, `pi` prints the build command and repository directory to use.
 | `pi ~/repos/project-a --name frontend` | Select both project and session storage name |
 | `pi --help` | Show launcher usage without Docker |
 | `pi -- --help` | Show Pi's own help (not launcher help) |
-| `pi -- --version` | Forward a Pi CLI argument without selecting a workspace |
+| `pi -- --version` | Show Pi's version through Docker using the current workspace |
+| `pi --no-herdr` | Launch without Herdr preparation or socket access |
+| `pi --herdr` | Require Herdr support; fail if preparation fails |
+| `pi --herdr-status` | Read-only local Herdr diagnostics without Docker or installation |
 
-`--name` is a launcher option; put it before Pi arguments. Use `--` to pass
-remaining arguments directly to Pi.
+Put an explicit workspace first, then launcher options (`--name`, `--herdr`,
+`--no-herdr`, or `--herdr-status`), before Pi arguments. Use `--` to pass remaining
+arguments directly to Pi.
 
 ## Sessions and parallel work
 
@@ -40,8 +45,9 @@ defaults to the workspace directory name; the hash distinguishes absolute paths.
 Run the same command again to access that storage, then use Pi's session commands
 to resume a conversation. `--name` selects storage, not a conversation title.
 
-Multiple terminals can run separate containers. Each has its own session storage
-selection, but all share `data/config/` for settings, models, resources, and
+Multiple terminals can run separate containers. Identical workspace/name
+selections share session storage; use different names for separate storage.
+All containers share `data/config/` for settings, models, resources, and
 authentication, plus the host's read-only `.gitconfig` and read-only
 `data/gh-config/` GitHub CLI configuration.
 
@@ -50,10 +56,15 @@ Use separate Git worktrees for concurrent writing agents. See
 
 ## Herdr
 
-Herdr reporting and native restore are opt-in with the launcher's `--herdr`
-flag. Ordinary launches do not expose Herdr's control socket. See
-[Herdr integration](HERDER_INTEGRATION.md) for installation, launch and restore
-requirements, diagnostics, shutdown safeguards, and a host trial.
+Eligible interactive launches inside a local Linux Herdr pane automatically
+enable reporting/native restore and install/update the official integration when
+needed. Enabled launches print a notice: the socket grants control of the entire
+connected Herdr session, including other panes. Use only with trusted containers.
+
+Use `--no-herdr` to disable preparation and socket access, or `--herdr` to require
+support rather than warn and fall back if preparation fails. Headless and
+maintenance invocations do not auto-enable support. See
+[Herdr integration](HERDER_INTEGRATION.md) for requirements, restore, and diagnostics.
 
 ## GitHub CLI
 

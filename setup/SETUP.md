@@ -17,6 +17,7 @@ For OpenAI/provider login and GitHub credentials, see
 - Docker Engine and the Compose plugin.
 - NVIDIA Container Toolkit for the configured Ollama GPU service.
 - Bash, GNU `realpath`, and `sha256sum` for the launchers.
+- Optional Herdr integration: host Herdr and `flock` (util-linux).
 - A host `~/.gitconfig` file (mounted read-only for Git identity and settings).
 
 ## Directory layout and persistence
@@ -95,16 +96,18 @@ current workspace. `pi --help` shows launcher usage without requiring Docker;
 
 ### Optional Herdr integration
 
-With Herdr already installed on the host, install its official Pi extension into
-this deployment's configuration:
+Install Herdr on the host, then launch `pi /absolute/path/to/project` inside a
+Herdr pane. Eligible interactive launches automatically install/update its
+official Pi extension in this deployment's configuration and enable support.
+To install/update explicitly instead:
 
 ```bash
-./setup/bin/add-herdr-integration install
+./setup/bin/herdr-extension install
 ```
 
-No image rebuild is needed; start a new container from a Herdr pane with
-`pi /absolute/path/to/project --herdr` to enable the integration. Ordinary
-launches do not expose Herdr's control socket. See
+No image rebuild is needed. Enabled launches print a socket-access notice.
+Use `--no-herdr` to prevent installation and socket exposure, or `--herdr` to
+require integration rather than warn and fall back on preparation failure. See
 [Herdr integration](HERDER_INTEGRATION.md) for requirements, updates/removal,
 restore, diagnostics, and socket security.
 
@@ -127,7 +130,8 @@ restore, diagnostics, and socket security.
   mounted projects and reach services on the shared Docker network.
 - Optional [Herdr mode](HERDER_INTEGRATION.md) exposes Herdr's full local control
   socket, including control of other panes. Use it only with trusted containers;
-  ordinary launches do not mount that socket.
+  eligible interactive launches inside Herdr enable it automatically with a
+  notice. Use `--no-herdr` to prevent installation and socket exposure.
 - No Docker socket is mounted and Docker is not installed in the Pi image.
   Rebuilds and container management are host-side operations.
 - Provider compatibility and OAuth availability depend on upstream releases and

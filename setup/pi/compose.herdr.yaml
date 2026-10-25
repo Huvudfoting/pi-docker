@@ -1,4 +1,4 @@
-# Explicit opt-in only; setup/bin/pi supplies validated host context.
+# Enabled by auto detection or --herdr; setup/bin/pi validates host context.
 # Session target interpolation in compose.yaml gives restore a stable namespace.
 services:
   pi:

@@ -7,8 +7,8 @@ const { randomUUID } = require("node:crypto");
 const usage = `Usage inside Docker-Pi: /opt/pi-docker/bin/stop-herdr
 
 Stops the ENTIRE Herdr session connected through HERDR_SOCKET_PATH, including
-all its panes and processes, not just this Pi container. Requires a --herdr
-launch. This is not detach; use Ctrl+B, then Q to leave Herdr without stopping it.
+all its panes and processes, not just this Pi container. Requires a Herdr-enabled
+launch (auto-detected or explicit --herdr). This is not detach; use Ctrl+B, then Q to leave Herdr without stopping it.
 
 --help, -h  Show this help without contacting Herdr.
 
@@ -32,7 +32,7 @@ if (args.length !== 0) {
 
 const socketPath = process.env.HERDR_SOCKET_PATH;
 if (process.platform !== "linux" || process.env.HERDR_ENV !== "1" || !process.env.HERDR_PANE_ID || !socketPath?.startsWith("/")) {
-  fail("Run inside a local Linux Docker-Pi container launched with --herdr in a live Herdr pane.");
+  fail("Run inside a local Linux Docker-Pi container auto-detected or launched with --herdr in a live Herdr pane.");
 }
 try {
   if (!fs.statSync(socketPath).isSocket()) throw new Error("not a socket");

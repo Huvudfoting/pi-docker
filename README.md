@@ -1,42 +1,39 @@
-# Pi Docker + Ollama
+# Pi Docker + Ollama + Herdr
 
-Run Pi in disposable Docker containers with persistent configuration and sessions.
+Run Pi in disposable Docker containers with persistent projects, configuration,
+and sessions. Use a shared Ollama service for local inference or configured
+cloud providers.
 
-- [Everyday usage](setup/README.md)
-- [Optional Herdr integration and host trial](setup/HERDER_INTEGRATION.md)
-- [Installation](setup/SETUP.md)
-- [OpenAI/provider login and GitHub authentication](setup/AUTHENTICATION.md)
+Eligible interactive launches inside a Herdr pane automatically enables 
+the official Pi integration. 
+Use `--no-herdr` to disable integration or `--herdr` to require it.
+
+## Get started
+
+Follow [installation](setup/SETUP.md), then run on the host:
+
+```bash
+pi ~/repos/project
+```
+
+`pi --help` gives an overview of available options.
+
+## Guides
+
+- [Everyday usage and sessions](setup/README.md)
+- [Herdr integration and diagnostics](setup/HERDER_INTEGRATION.md)
+- [Provider login and GitHub authentication](setup/AUTHENTICATION.md)
 - [Extensions, configuration, and maintenance](setup/CUSTOMIZATION.md)
-- [Agent setup-discovery instructions](setup/AGENTS.md)
+- [Container agent instructions](setup/AGENTS.md)
 
 ## Repository layout
 
-```text
-setup/                   # Non-secret deployment source; mounted read-only in Pi
-  README.md
-  HERDER_INTEGRATION.md
-  SETUP.md
-  AUTHENTICATION.md
-  CUSTOMIZATION.md
-  AGENTS.md
-  extensions/            # Homemade extensions only; downloaded ones are image npm packages
-  bin/pi
-  bin/add-herdr-integration
-  bin/stop-herdr          # Container-side, explicit shutdown of connected Herdr session
-  lib/herdr.sh           # Launcher support for Herdr restore and diagnostics
-  pi/Dockerfile
-  pi/compose.yaml
-  ollama/compose.yaml
-  ollama/.env.example
-data/                    # Private local state; ignored by Git; never mount as setup
-  config/
-  gh-config/             # Optional hosts.yml token; mounted read-only for gh
-  sessions/
-  ollama.env
-```
+- **`setup/`** — non-secret launchers, deployment files, extensions, and guides;
+  mounted read-only at `/opt/pi-docker` inside Pi.
+- **`data/`** — private configuration, credentials, sessions, and service settings;
+  ignored by Git. Never put secrets under `setup/`.
 
-Keep `setup/` non-secret. See [mounts and persistence](setup/SETUP.md#directory-layout-and-persistence)
-and [security](setup/SETUP.md#security-and-concurrency) for access boundaries.
+Containers share configuration and credentials; use separate Git worktrees for
+concurrent writing agents. See [security and concurrency](setup/SETUP.md#security-and-concurrency).
 
-Run host commands in the linked guides from this repository root unless stated
-otherwise.
+Run host commands in the guides from this repository root unless stated otherwise.

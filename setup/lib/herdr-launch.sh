@@ -6,7 +6,7 @@
 readonly HERDR_SESSION_NAMESPACE=/pi/herdr-sessions
 readonly HERDR_RECORDS="$root/data/herdr-launches"
 readonly HERDR_EXTENSION="$root/data/config/extensions/herdr-agent-state.ts"
-readonly HERDR_INSTALL_COMMAND='setup/bin/add-herdr-integration install'
+readonly HERDR_INSTALL_COMMAND='setup/bin/herdr-extension install'
 
 herdr_storage_key() {
   printf '%s\0%s' "$workspace" "$name" | sha256sum | cut -d' ' -f1
@@ -76,6 +76,29 @@ herdr_validate_arguments() {
   done
 }
 
+herdr_warn_fallback() {
+  printf 'pi-docker: WARNING: Herdr integration unavailable; launching without socket access.\n  Herdr reporting and native restore are unavailable for this launch.\n' >&2
+}
+
+herdr_select_mode() {
+  case "$herdr_mode" in
+    disabled) return ;;
+    required) herdr=1; return ;;
+  esac
+  # Reuse strict argument validation in a subshell: unsupported invocations stay
+  # ordinary, and fail() cannot exit the parent launcher during auto detection.
+  [[ -t 0 && -t 1 ]] || return 0
+  (herdr_validate_arguments "$@") >/dev/null 2>&1 || return 0
+  # Partial/stale pane context deserves a warning, but no installer invocation.
+  if [[ ${HERDR_ENV:-} == 1 || -n ${HERDR_PANE_ID:-} || -n ${HERDR_SOCKET_PATH:-} ]]; then
+    if (herdr_validate_context); then
+      herdr=1
+    else
+      herdr_warn_fallback
+    fi
+  fi
+}
+
 herdr_validate_context() {
   [[ "$(uname -s)" == Linux ]] || fail "Herdr mode currently supports local Linux Docker Engine only"
   [[ -t 0 && -t 1 ]] \
@@ -84,8 +107,6 @@ herdr_validate_context() {
     || fail "Herdr mode requires a current Herdr pane (HERDR_ENV=1 and HERDR_PANE_ID). Open a Herdr pane, then retry; do not set fake pane variables. See pi --herdr-status."
   herdr_has_owned_socket \
     || fail "HERDR_SOCKET_PATH must select an existing Unix socket owned by the current user. Retry from a live same-user Herdr pane; pi --herdr-status shows local context checks."
-  herdr_has_extension \
-    || fail "Missing or unreadable official Herdr Pi extension: $HERDR_EXTENSION. From the docker-pi repository root, run on the host: $HERDR_INSTALL_COMMAND"
 }
 
 herdr_validate_session_file() {
@@ -112,11 +133,8 @@ herdr_save_record() (
 )
 
 herdr_prepare() {
-  herdr_validate_context
-  if [[ -z "$restore_ref" ]]; then
-    herdr_validate_arguments "$@"
-  fi
-
+  # Context, arguments, restore file, and upstream integration were checked by
+  # the caller. Never turn record/restore failures into an ordinary launch.
   HERDR_SOCKET_HOST_PATH="$(realpath -e -- "$HERDR_SOCKET_PATH")"
   export HERDR_SOCKET_HOST_PATH
   PI_SESSION_TARGET="$HERDR_SESSION_NAMESPACE/$(herdr_storage_key)"
