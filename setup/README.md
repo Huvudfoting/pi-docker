@@ -1,4 +1,4 @@
-# Using Pi with Docker
+# Using Pi with Docker, optionally in Herdr
 
 Run Pi in disposable containers with persistent projects, configuration, and
 sessions. Local inference uses the shared Ollama service; starting Pi does not
@@ -138,6 +138,30 @@ status check does not prove socket connectivity, writable storage, image/daemon
 availability, version compatibility, or live reporting/restore readiness.
 Outside a Herdr pane, missing context is expected. Use `pi --help` for launcher
 options; `pi -- --help` forwards to Pi's own help.
+
+### Stop Herdr from inside Pi
+
+To stop the **entire connected Herdr session, including all its panes and
+processes**, enter this in Pi's input:
+
+```text
+!/opt/pi-docker/bin/stop-herdr --yes
+```
+
+For Pi's shell tool or an ordinary container shell, use the same command without
+the leading `!`. The helper requires an explicit `--yes`, a `--herdr` launch,
+and the current mounted socket. It sends one `server.stop` request to that
+endpoint, so it targets the connected session rather than guessing the default
+session. It does not require the Herdr CLI, an image rebuild, or a container
+restart: the helper is available through the deployment-source mount.
+
+This is **not detach**. To leave Herdr while keeping agents running, use its
+default **Ctrl+B, then Q** binding. To exit only Pi, use `/exit`.
+
+Stopping Herdr may terminate this container before its acknowledgement appears.
+A lost acknowledgement or timeout means the outcome is unknown; check Herdr
+before retrying. The helper never retries automatically. Without `--yes`, or
+with `--help`, it does not contact Herdr.
 
 ### Short host trial
 

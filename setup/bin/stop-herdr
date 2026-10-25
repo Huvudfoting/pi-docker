@@ -1,0 +1,79 @@
+#!/usr/bin/env node
+// Container-side, explicit server.stop client. No Herdr CLI or dependencies.
+const net = require("node:net");
+const fs = require("node:fs");
+const { randomUUID } = require("node:crypto");
+
+const usage = `Usage inside Docker-Pi: /opt/pi-docker/bin/stop-herdr --yes
+
+Stops the ENTIRE Herdr session connected through HERDR_SOCKET_PATH, including
+all its panes and processes, not just this Pi container. Requires a --herdr
+launch. This is not detach; use Ctrl+B, then Q to leave Herdr without stopping it.
+
+--yes       Explicitly confirm stopping the entire connected session.
+--help, -h  Show this help without contacting Herdr.
+
+The container may terminate before the acknowledgement can be displayed.
+No automatic retries are made; a lost acknowledgement does not prove failure.
+`;
+
+function fail(message, code = 2) {
+  console.error(`stop-herdr: ${message}`);
+  process.exit(code);
+}
+
+const args = process.argv.slice(2);
+if (args.length === 1 && ["--help", "-h"].includes(args[0])) {
+  console.log(usage);
+  process.exit(0);
+}
+if (args.length !== 1 || args[0] !== "--yes") {
+  fail("This stops ALL panes in the connected Herdr session. Pass --yes to confirm, or --help for usage.");
+}
+
+const socketPath = process.env.HERDR_SOCKET_PATH;
+if (process.platform !== "linux" || process.env.HERDR_ENV !== "1" || !process.env.HERDR_PANE_ID || !socketPath?.startsWith("/")) {
+  fail("Run inside a local Linux Docker-Pi container launched with --herdr in a live Herdr pane.");
+}
+try {
+  if (!fs.statSync(socketPath).isSocket()) throw new Error("not a socket");
+} catch {
+  fail("The selected Herdr socket is missing or inaccessible. Start a new --herdr container from a live pane.");
+}
+
+console.error("stop-herdr: Requesting shutdown of the ENTIRE connected Herdr session (all panes and processes).");
+const id = `stop-herdr:${randomUUID()}`;
+const socket = net.createConnection(socketPath);
+let finished = false;
+let response = "";
+const deadline = setTimeout(() => finish(1, "Timed out waiting for acknowledgement; shutdown may already have happened. Check Herdr before retrying."), 2000);
+
+function finish(code, message) {
+  if (finished) return;
+  finished = true;
+  clearTimeout(deadline);
+  socket.destroy();
+  process.exitCode = code;
+  if (message) console.error(`stop-herdr: ${message}`);
+}
+
+socket.setEncoding("utf8");
+socket.on("connect", () => socket.write(`${JSON.stringify({ id, method: "server.stop", params: {} })}\n`));
+socket.on("data", (chunk) => {
+  response += chunk;
+  if (Buffer.byteLength(response) > 65536) return finish(1, "Oversized response; shutdown status is unknown.");
+  const end = response.indexOf("\n");
+  if (end === -1) return;
+  let reply;
+  try {
+    reply = JSON.parse(response.slice(0, end));
+  } catch {
+    return finish(1, "Invalid response; shutdown status is unknown.");
+  }
+  if (reply?.id !== id) return finish(1, "Response ID mismatch; shutdown status is unknown.");
+  if (reply.error) return finish(1, `Herdr rejected shutdown: ${reply.error.message || reply.error.code || "unspecified error"}`);
+  if (reply.result?.type !== "ok") return finish(1, "Unexpected response; shutdown status is unknown.");
+  finish(0, "Herdr acknowledged the shutdown request.");
+});
+socket.on("error", (error) => finish(1, `Socket error (${error.code || "unknown"}); shutdown status is unknown. No retry was made.`));
+socket.on("close", () => finish(1, "Connection closed before acknowledgement; shutdown may already have happened. Check Herdr before retrying."));

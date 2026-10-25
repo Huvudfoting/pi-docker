@@ -16,6 +16,13 @@ Read only the relevant mounted guide; do not search `/workspace` for these docs:
 - Runtimes, resources, extension policy, maintenance: `/opt/pi-docker/CUSTOMIZATION.md`.
 - Launcher and session usage: `/opt/pi-docker/README.md`.
 
+## Herdr shutdown
+When explicitly asked to stop the entire connected Herdr session, use
+`/opt/pi-docker/bin/stop-herdr --yes` through the shell tool. This stops all panes
+and processes, not just Pi; clarify first if the user only wants to exit Pi or
+detach. The helper requires a `--herdr` launch. It may terminate this container
+before acknowledgement; do not automatically retry an ambiguous result.
+
 ## GitHub
 Use `gh` via bash for GitHub operations.
 Pass repositories as OWNER/REPO; discover unknown owners with `gh repo list --limit 100`.

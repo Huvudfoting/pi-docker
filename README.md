@@ -21,6 +21,7 @@ setup/                   # Non-secret deployment source; mounted read-only in Pi
   extensions/            # Homemade extensions only; downloaded ones are image npm packages
   bin/pi
   bin/add-herdr-integration
+  bin/stop-herdr          # Container-side, explicit shutdown of connected Herdr session
   lib/herdr.sh           # Launcher support for Herdr restore and diagnostics
   pi/Dockerfile
   pi/compose.yaml

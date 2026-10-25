@@ -86,6 +86,7 @@ The corresponding upstream Pi repository is:
 - `setup/AGENTS.md`
 - `setup/bin/pi`
 - `setup/bin/add-herdr-integration`
+- `setup/bin/stop-herdr`
 - `setup/lib/herdr.sh`
 - `setup/pi/compose.yaml`
 - `setup/pi/Dockerfile`
@@ -487,6 +488,21 @@ records, storage layout, and native restore arguments are unchanged by this
 refactoring. Launcher help uses repository-relative commands/documentation
 paths rather than deployment-specific absolute paths.
 
+### Explicit container-side shutdown helper
+
+`setup/bin/stop-herdr`, available inside the container at
+`/opt/pi-docker/bin/stop-herdr`, sends one `server.stop` request through the
+current mounted socket. It requires `--yes` and Herdr pane context, uses Node's
+built-in socket client with a bounded response wait, and does not require the
+host Herdr binary or an image rebuild. This is an explicit control command,
+not an additional state reporter or automatic lifecycle hook.
+
+It stops the entire connected Herdr session, including other panes and
+processes. Detach and exiting only Pi remain separate actions. The container
+may terminate before an acknowledgement is displayed; a lost acknowledgement
+is reported as ambiguous, and the helper never retries automatically. Help or
+an invocation without confirmation never contacts Herdr.
+
 ### Validation status
 
 The user completed the short host trial documented in `setup/README.md` and
@@ -505,6 +521,10 @@ a different directory and through a symlink. These checks cover local routing,
 failure handling, and correct configuration targeting, not live Herdr behavior.
 The successful host trial validates the core launch/restore path; the new
 installer has not yet been exercised against the real host Herdr binary.
+Four additional shutdown-helper checks use temporary Unix sockets to cover
+confirmation/context guards, the stop request and acknowledgement, rejected or
+invalid responses, and lost acknowledgement without retry. They do not stop a
+real Herdr server; the shutdown helper still needs a user-run host trial.
 
 Treat this working slice as the baseline. The questionnaire blocked-event
 adapter remains deferred at the user's request. Socket-inode replacement
