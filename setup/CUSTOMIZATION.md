@@ -29,10 +29,13 @@ automatic Python downloads; use the image-provided interpreter.
 ### Herdr-managed exception
 
 The official `herdr-agent-state.ts` is installed and updated by host Herdr into
-`data/config/extensions/`, using a host `PI_CODING_AGENT_DIR` override. It is
-not an image-managed npm package and must not be vendored or modified here.
-Pi discovers it normally at `/pi/agent/extensions/`; it remains inactive without
-Herdr context. See [Herdr usage and the host trial](README.md#herdr).
+`data/config/extensions/`. Run `setup/bin/add-herdr-integration install` on the host; the
+script selects this deployment's `PI_CODING_AGENT_DIR` automatically and delegates
+to Herdr. Re-run it after updating Herdr, or use `setup/bin/add-herdr-integration uninstall`
+to remove only the managed extension. It is not an image-managed npm package
+and must not be vendored or modified here. Pi discovers it normally at
+`/pi/agent/extensions/`; it remains inactive without Herdr context. See
+[Herdr usage and the host trial](README.md#herdr).
 
 ### Subscription usage extension
 
@@ -57,6 +60,15 @@ Shared resources affect all instances; project resources require Pi project trus
 
 Extension folders accept `.ts`/`.js` files or subdirectories with `index.ts` or
 `index.js`. Skills are subdirectories containing `SKILL.md`.
+
+## Launcher structure
+
+`setup/bin/pi` keeps the launch flow explicit: parse arguments, select the
+workspace/storage, optionally show diagnostics, configure Docker/Herdr, then
+execute Pi. Herdr-specific restore records, validation, and diagnostics are
+isolated in `setup/lib/herdr.sh`; sourcing it does not create deployment state.
+Keep argument forwarding and the final `exec` visible in the launcher rather
+than adding a background supervisor or a second lifecycle reporter.
 
 ## Applying changes
 

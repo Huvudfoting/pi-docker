@@ -25,6 +25,9 @@ missing, `pi` prints the build command and repository directory to use.
 | `pi ~/repos/project-a` | Mount a specific project |
 | `pi --name backend` | Use separate session storage in the current project |
 | `pi ~/repos/project-a --name frontend` | Select both project and session storage name |
+| `pi --help` | Show launcher usage without Docker |
+| `pi ~/repos/project-a --name backend --herdr-status` | Read-only local Herdr diagnostics |
+| `pi -- --help` | Show Pi's own help (not launcher help) |
 | `pi -- --version` | Forward a Pi CLI argument without selecting a workspace |
 
 `--name` is a launcher option; put it before Pi arguments. Use `--` to pass
@@ -56,15 +59,32 @@ On the host, from this deployment's repository root, install the managed
 extension into Docker-Pi's configuration (not the host's default `~/.pi/agent`):
 
 ```bash
-mkdir -p data/config
-PI_CODING_AGENT_DIR="$PWD/data/config" herdr integration install pi
+./setup/bin/add-herdr-integration install
 ```
 
-Use the same directory override when reinstalling/updating or uninstalling the
-integration. No image rebuild is needed for the launcher/Compose changes or
-this managed extension. Start a new container after installing it. A compatible
-Pi image and Herdr release are required; this slice follows the upstream
-behavior reviewed in the repository's `PLAN.md`.
+The action defaults to `install`, so `./setup/bin/add-herdr-integration` works too. The
+script resolves its own deployment location, even through a symlink or when
+called by absolute path from another directory. It sets
+`PI_CODING_AGENT_DIR=<deployment>/data/config` only for the official Herdr CLI
+invocation, overriding any inherited setting. It does not change your shell
+environment or manufacture pane context. Herdr must already be installed on
+the host: the script uses the executable `HERDR_BIN_PATH` supplied by a current
+pane, or otherwise `herdr` on `PATH`. No running Herdr session or Docker daemon
+is needed for installation.
+
+Re-run `install` after upgrading Herdr to refresh its managed extension. To
+remove only that extension:
+
+```bash
+./setup/bin/add-herdr-integration uninstall
+```
+
+Configuration, credentials, sessions, and launch records are retained. No image
+rebuild is needed; start a new container after installing/updating, or launch
+without `--herdr` after uninstalling. Existing Pi processes are unchanged.
+`./setup/bin/add-herdr-integration --help` describes the installer. A compatible Pi image
+and Herdr release are required; this integration follows the upstream behavior
+reviewed in the repository's `PLAN.md`.
 
 Inside a Herdr pane, launch:
 
@@ -96,6 +116,28 @@ overrides, ephemeral sessions, disabled extension discovery, headless modes,
 and maintenance commands are rejected with `--herdr`. Other launch flags are
 not recorded for replay; the restore promise is workspace, storage, and the
 existing conversation.
+
+### Local diagnostics
+
+```bash
+pi /absolute/path/to/project --name herdr-trial --herdr-status
+```
+
+This shows the selected workspace/storage, expected container session path,
+extension presence, launch-record presence, current pane/socket availability,
+and whether `pi` on `PATH` points to this launcher for native restore. It does
+not create directories, read credentials or session contents, inspect record
+contents, contact the socket, or invoke Docker/Herdr. Output includes local
+paths and the pane ID; review it before sharing.
+
+Exit status is `0` when the reported local prerequisites are present, `1` when
+something is missing, and `2` for invalid arguments or workspace selection.
+A missing launch record is normal before the first Herdr launch. TTY status is
+informational for diagnostics, so output can be redirected. Even a successful
+status check does not prove socket connectivity, writable storage, image/daemon
+availability, version compatibility, or live reporting/restore readiness.
+Outside a Herdr pane, missing context is expected. Use `pi --help` for launcher
+options; `pi -- --help` forwards to Pi's own help.
 
 ### Short host trial
 

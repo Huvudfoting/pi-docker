@@ -33,10 +33,13 @@ class HerdrLauncherTest(unittest.TestCase):
         self.log = self.root / "docker.json"
         self.bin = self.root / "bin"
         self.bin.mkdir()
+        (self.bin / "pi").symlink_to(self.setup / "bin/pi")
+        self.probes = self.root / "docker-probes.log"
         docker = self.bin / "docker"
         docker.write_text(
             f"#!{sys.executable}\n"
             "import json, os, sys\n"
+            "with open(os.environ['DOCKER_PROBE_LOG'], 'a') as f: f.write('called\\n')\n"
             "if sys.argv[1:3] == ['image', 'inspect']: sys.exit(0)\n"
             "keys = ['PI_WORKSPACE', 'PI_SESSIONS', 'PI_SESSION_TARGET', "
             "'HERDR_ENV', 'HERDR_PANE_ID', 'HERDR_SOCKET_HOST_PATH', 'HERDR_AGENT']\n"
@@ -50,6 +53,7 @@ class HerdrLauncherTest(unittest.TestCase):
             "PATH": f"{self.bin}:{os.environ['PATH']}",
             "HOME": str(self.root),
             "DOCKER_LOG": str(self.log),
+            "DOCKER_PROBE_LOG": str(self.probes),
         }
         self.sock = self.make_socket("herdr.sock")
         self.env.update(HERDR_ENV="1", HERDR_PANE_ID="w1:p1", HERDR_SOCKET_PATH=str(self.sock))
@@ -89,6 +93,115 @@ class HerdrLauncherTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         return invocation
 
+    def run_command(self, command, *args, env=None):
+        return subprocess.run(
+            [str(command), *args], cwd=self.other,
+            env=self.env if env is None else env,
+            stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=10,
+        )
+
+    def fake_herdr(self):
+        herdr = self.bin / "herdr"
+        herdr.write_text(
+            f"#!{sys.executable}\n"
+            "import json, os, sys\n"
+            "from pathlib import Path\n"
+            "config = Path(os.environ['PI_CODING_AGENT_DIR'])\n"
+            "with open(os.environ['HERDR_LOG'], 'w') as f:\n"
+            "    json.dump({'args': sys.argv[1:], 'config': str(config)}, f)\n"
+            "if os.environ.get('HERDR_EXIT'): sys.exit(int(os.environ['HERDR_EXIT']))\n"
+            "target = config / 'extensions/herdr-agent-state.ts'\n"
+            "if sys.argv[1:] == ['integration', 'install', 'pi']:\n"
+            "    if not os.environ.get('HERDR_SKIP_WRITE'):\n"
+            "        target.parent.mkdir(exist_ok=True)\n"
+            "        target.write_text('// managed test fixture\\n')\n"
+            "elif sys.argv[1:] == ['integration', 'uninstall', 'pi']:\n"
+            "    target.unlink(missing_ok=True)\n"
+            "else: sys.exit(64)\n"
+        )
+        herdr.chmod(0o755)
+        self.env['HERDR_LOG'] = str(self.root / 'herdr.json')
+        return herdr
+
+    def test_help_and_status_are_read_only_without_docker_calls(self):
+        private = self.root / "data/config/auth.json"
+        private.write_text('TEST-ONLY-secret-do-not-print')
+        before = sorted(p.relative_to(self.root) for p in (self.root / "data").rglob("*"))
+        result = self.run_command(self.setup / "bin/pi", "--help")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("--herdr-status", result.stdout)
+        self.assertIn("setup/bin/add-herdr-integration install", result.stdout)
+        self.assertNotIn(str(self.root), result.stdout)
+        self.assertNotRegex(result.stdout, r"(?:^|\s)/[^\s]*")
+        result = self.run_command(self.setup / "bin/pi", str(self.project), "--name", "backend", "--herdr-status")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Official extension: present", result.stdout)
+        self.assertIn("not created yet", result.stdout)
+        self.assertIn("Native restore PATH: pi resolves to this launcher", result.stdout)
+        self.assertIn("not contacted", result.stdout)
+        self.assertIn("informational here", result.stdout)
+        self.assertNotIn(private.read_text(), result.stdout + result.stderr)
+        self.assertEqual(before, sorted(p.relative_to(self.root) for p in (self.root / "data").rglob("*")))
+        self.assertFalse(self.probes.exists())
+
+    def test_status_reports_missing_context_and_extension_without_changes(self):
+        (self.root / "data/config/extensions/herdr-agent-state.ts").unlink()
+        result = self.run_command(
+            self.setup / "bin/pi", "--herdr-status", env={**self.env, "HERDR_ENV": "", "HERDR_SOCKET_PATH": ""},
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("Official extension: missing", result.stdout)
+        self.assertIn("Pane context: missing", result.stdout)
+        self.assertIn("Host socket: missing", result.stdout)
+        self.assertFalse(self.probes.exists())
+        self.assertFalse((self.root / "data/herdr-launches").exists())
+        self.assertFalse((self.root / "data/sessions").exists())
+
+    def test_installer_resolves_symlink_and_overrides_only_target_configuration(self):
+        herdr = self.fake_herdr()
+        config = self.root / "data/config"
+        private = config / "auth.json"
+        private.write_text('TEST-ONLY-secret-do-not-print')
+        alias = self.bin / "install-herdr"
+        alias.symlink_to(self.setup / "bin/add-herdr-integration")
+        # Match the owning binary even if it is not named herdr on PATH.
+        owning = herdr.with_name("owning-herdr")
+        herdr.rename(owning)
+        env = {**self.env, "HERDR_BIN_PATH": str(owning), "PI_CODING_AGENT_DIR": "/wrong/config"}
+        for action in ((), ("install",), ("uninstall",)):
+            result = self.run_command(alias, *action, env=env)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            call = json.loads(Path(self.env['HERDR_LOG']).read_text())
+            self.assertEqual(call['config'], str(config))
+            self.assertEqual(call['args'], ['integration', action[0] if action else 'install', 'pi'])
+            self.assertNotIn(private.read_text(), result.stdout + result.stderr)
+        self.assertFalse((config / "extensions/herdr-agent-state.ts").exists())
+        self.assertEqual(private.read_text(), 'TEST-ONLY-secret-do-not-print')
+        self.assertFalse(self.probes.exists())
+
+    def test_installer_creates_only_needed_state_and_reports_failures(self):
+        self.fake_herdr()
+        shutil.rmtree(self.root / "data")  # Only this test's private fixture.
+        installer = self.setup / "bin/add-herdr-integration"
+        for args in (("--help",), ("uninstall",), ("invalid",)):
+            result = self.run_command(installer, *args)
+            self.assertEqual(result.returncode, 2 if args == ("invalid",) else 0, result.stderr)
+            self.assertFalse((self.root / "data").exists())
+            self.assertFalse(Path(self.env['HERDR_LOG']).exists())
+        result = self.run_command(installer)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        extension = self.root / "data/config/extensions/herdr-agent-state.ts"
+        self.assertTrue(extension.is_file())
+        self.assertEqual((self.root / "data/config").stat().st_mode & 0o777, 0o700)
+        extension.unlink()
+        result = self.run_command(installer, env={**self.env, "HERDR_SKIP_WRITE": "1"})
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("returned success but no readable", result.stderr)
+        result = self.run_command(installer, env={**self.env, "HERDR_EXIT": "23"})
+        self.assertEqual(result.returncode, 23)
+        self.assertIn("Herdr install failed", result.stderr)
+        self.assertFalse(self.probes.exists())
+
     def test_standalone_keeps_default_boundary_even_in_herdr_shell(self):
         env = {**self.env, "PI_SESSION_TARGET": "/unexpected"}
         result, invocation = self.launch(self.project, "--name", "backend", "--", "--version", env=env)
@@ -98,6 +211,23 @@ class HerdrLauncherTest(unittest.TestCase):
         self.assertIsNone(invocation["env"]["HERDR_AGENT"])
         self.assertEqual(invocation["args"][-1], "--version")
         self.assertFalse((self.root / "data/herdr-launches").exists())
+
+    def test_pi_arguments_are_forwarded_verbatim_after_launcher_options(self):
+        arguments = ["--model", "provider/model", "--name", "conversation title", "--", "--herdr is prompt text"]
+        result, invocation = self.launch(self.project, "--name", "backend", "--", *arguments)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(invocation["args"][-len(arguments):], arguments)
+        result, invocation = self.launch("--", "--help")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(invocation["args"][-1], "--help")  # Pi help, not launcher help.
+
+    def test_herdr_record_publication_leaves_no_temporary_files(self):
+        first = self.initial_launch()
+        self.initial_launch()  # Reusing the same selection must be idempotent.
+        records = self.root / "data/herdr-launches"
+        self.assertEqual(len(list(records.glob("*.record"))), 1)
+        self.assertEqual(list(records.glob(".launch.*")), [])
+        self.assertEqual(first["env"]["PI_WORKSPACE"], str(self.project))
 
     def test_native_restore_recovers_selection_and_uses_fresh_context(self):
         original = self.initial_launch()

@@ -20,7 +20,8 @@ setup/                   # Non-secret deployment source; mounted read-only in Pi
   AGENTS.md
   extensions/            # Homemade extensions only; downloaded ones are image npm packages
   bin/pi
-  bin/pi-login
+  bin/add-herdr-integration
+  lib/herdr.sh           # Launcher support for Herdr restore and diagnostics
   pi/Dockerfile
   pi/compose.yaml
   ollama/compose.yaml

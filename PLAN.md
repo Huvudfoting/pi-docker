@@ -85,6 +85,8 @@ The corresponding upstream Pi repository is:
 - `setup/CUSTOMIZATION.md`
 - `setup/AGENTS.md`
 - `setup/bin/pi`
+- `setup/bin/add-herdr-integration`
+- `setup/lib/herdr.sh`
 - `setup/pi/compose.yaml`
 - `setup/pi/Dockerfile`
 - `/usr/local/lib/node_modules/@juicesharp/rpiv-ask-user-question/events.ts`
@@ -458,6 +460,33 @@ disabled extension discovery, and headless/maintenance invocations. Pi's
 interactive session operations remain available. Other CLI flags are not
 recorded for replay. The blocked-event adapter remains deferred.
 
+### Usability and installation support
+
+The launcher provides `--help` without Docker and a read-only `--herdr-status`
+for a selected workspace/name. Diagnostics report only local path, extension,
+record-presence, pane/socket, Docker-CLI-presence, and restore-PATH checks.
+They do not read credentials/session contents, inspect record contents, mutate
+state, contact Herdr, or invoke Docker. A successful report is not a guarantee
+of live connectivity, writable storage, image availability, or restore readiness.
+TTY status is informational so diagnostic output can be redirected.
+
+The host helper `setup/bin/add-herdr-integration [install|uninstall]` resolves its deployment
+location, including symlinks, and sets `PI_CODING_AGENT_DIR` only for its Herdr
+CLI invocation. It delegates to the official installer, verifies the resulting
+managed file's presence/removal, and preserves credentials, sessions, and launch
+records. Installation defaults to install/update, requires an existing host
+Herdr binary, and needs no Docker daemon or active pane. No fake pane context
+or additional reporter is introduced.
+
+The launcher is organized around a short `main` flow: parse arguments, resolve
+workspace/storage, optionally report diagnostics, check Docker, prepare Herdr
+when requested, prepare the container environment, and execute Pi. Herdr-specific
+restore validation, record publication, and diagnostics live in
+`setup/lib/herdr.sh`. Sourcing that helper creates no persistent state. Launch
+records, storage layout, and native restore arguments are unchanged by this
+refactoring. Launcher help uses repository-relative commands/documentation
+paths rather than deployment-specific absolute paths.
+
 ### Validation status
 
 The user completed the short host trial documented in `setup/README.md` and
@@ -468,9 +497,14 @@ the core launch-and-restore path in that deployment:
 - host wrapper identification and socket-based state/session reporting;
 - native restore into the original workspace, storage selection, and conversation.
 
-The local Bash syntax and five focused fake-Docker launcher checks also passed.
-Those checks cover launcher routing and failure handling; the successful host
-trial supplies the real Docker/Herdr validation they could not provide.
+The baseline's local Bash syntax and five focused fake-Docker launcher checks
+also passed. The usability/installer and readability passes expand this to eleven focused checks,
+including read-only diagnostics, repository-relative help, verbatim Pi argument
+forwarding, temporary-record cleanup, and a fake-Herdr installer exercised from
+a different directory and through a symlink. These checks cover local routing,
+failure handling, and correct configuration targeting, not live Herdr behavior.
+The successful host trial validates the core launch/restore path; the new
+installer has not yet been exercised against the real host Herdr binary.
 
 Treat this working slice as the baseline. The questionnaire blocked-event
 adapter remains deferred at the user's request. Socket-inode replacement

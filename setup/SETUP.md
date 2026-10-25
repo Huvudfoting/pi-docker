@@ -90,7 +90,12 @@ pi -- --version
 ```
 
 The launcher resolves symlinks to find this repository, independently of the
-current workspace.
+current workspace. `pi --help` shows launcher usage without requiring Docker;
+`pi -- --help` opens Pi's own help through Docker.
+
+For optional Herdr integration, run `./setup/bin/add-herdr-integration install` on the host.
+It targets this deployment's configuration automatically. See
+[Herdr usage and local diagnostics](README.md#herdr) for scope and security.
 
 ## Security and concurrency
 
