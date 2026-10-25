@@ -4,6 +4,11 @@ Disposable container: `/workspace` is the writable project, `/pi/agent` is share
 configuration/credentials, `/pi/sessions` is session storage, and `/opt/pi-docker`
 is read-only deployment source (possibly newer than the image).
 
+## Execution boundary
+You are running inside a Pi Docker container, not on the host.
+- Tool commands execute inside this container.
+- `/workspace` is the mounted project; its absolute host path may differ.
+
 Read only the relevant mounted guide; do not search `/workspace` for these docs:
 - Installation and security: `/opt/pi-docker/SETUP.md`.
 - OpenAI/provider login and GitHub credentials: `/opt/pi-docker/AUTHENTICATION.md`.
