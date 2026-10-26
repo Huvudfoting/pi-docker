@@ -17,7 +17,7 @@ automatic Python downloads; use the image-provided interpreter.
 
 ## Extension architecture decision
 
-- **All downloaded/third-party extensions:** install `package@latest` with npm in
+- **Downloaded/third-party extensions (except Herdr below):** install `package@latest` with npm in
   `setup/pi/Dockerfile`, baked into the image. Explicitly load them with
   `--extension` in `setup/bin/pi`; global npm installation alone does not load
   an extension. Do not vendor upstream code into custom folders or deploy it
@@ -25,6 +25,16 @@ automatic Python downloads; use the image-provided interpreter.
 - **Homemade extensions:** keep code in extension folders. Repository-owned tools
   go in `setup/extensions/`, mounted read-only at `/opt/pi-docker/extensions/`
   and loaded by the `pi` launcher. Personal/project folders are listed below.
+
+### Herdr-managed exception
+
+Host Herdr manages the official `herdr-agent-state.ts` reporter and operating
+skill under `data/config/`; do not vendor or modify them. Integrated launches
+prepare these resources automatically. The container CLI is image-managed;
+the Docker-Pi helper skill lives in `setup/skills/docker-pi-herdr/` and is loaded
+by the launcher. See [Herdr maintenance](HERDER_INTEGRATION.md#maintenance-and-diagnostics)
+for updates, removal and process refresh requirements. Use `--no-herdr` to skip
+preparation and socket exposure.
 
 ### Subscription usage extension
 
@@ -50,6 +60,18 @@ Shared resources affect all instances; project resources require Pi project trus
 Extension folders accept `.ts`/`.js` files or subdirectories with `index.ts` or
 `index.js`. Skills are subdirectories containing `SKILL.md`.
 
+## Launcher structure
+
+`setup/bin/pi` keeps the launch flow explicit: parse arguments, select the
+workspace/storage, optionally show diagnostics, configure Docker/Herdr, then
+execute Pi. Herdr-specific restore records, validation, and diagnostics are
+isolated in `setup/lib/herdr-launch.sh`; host executable resolution and strict upstream
+status parsing live in `setup/lib/herdr-extension.sh`. Sourcing these helpers
+does not create deployment state. `setup/bin/herdr-extension ensure`
+serializes integration status/install/verification before enabled launches.
+Keep argument forwarding and the final `exec` visible in the launcher rather
+than adding a background supervisor or a second lifecycle reporter.
+
 ## Applying changes
 
 | Change | Action |
@@ -62,11 +84,18 @@ Extension folders accept `.ts`/`.js` files or subdirectories with `index.ts` or
 
 ## Updating image-managed packages
 
-The Python/uv image tags and npm `@latest` track current releases rather than
-pinning versions. Pull fresh images and bypass build caches to update them:
+Pi and Herdr are pinned in `setup/pi/build-pi-docker.sh` (currently Pi 1.4.0 and Herdr
+0.9.5). Update those pins deliberately. Host/server/container mismatches are
+accepted; there is no runtime alignment gate. The script
+passes them as build arguments; direct Docker builds must supply both
+`PI_VERSION` and `HERDR_VERSION`. Pinning the image does not update or check host
+Herdr or an already-running server.
+
+Python/uv image tags and extension npm `@latest` still track current releases.
+To refresh those dependencies, bypass build caches:
 
 ```bash
-docker build --no-cache -t pi-agent:latest ./setup/pi
+./setup/pi/build-pi-docker.sh --no-cache
 docker run --rm pi-agent:latest --version
 ```
 

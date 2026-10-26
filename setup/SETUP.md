@@ -17,6 +17,7 @@ For OpenAI/provider login and GitHub credentials, see
 - Docker Engine and the Compose plugin.
 - NVIDIA Container Toolkit for the configured Ollama GPU service.
 - Bash, GNU `realpath`, and `sha256sum` for the launchers.
+- Optional Herdr integration: host Herdr and `flock` (util-linux).
 - A host `~/.gitconfig` file (mounted read-only for Git identity and settings).
 
 ## Directory layout and persistence
@@ -26,7 +27,8 @@ For OpenAI/provider login and GitHub credentials, see
 | `setup/` | `/opt/pi-docker` | Read-only, non-secret deployment source and guides |
 | `data/config/` | `/pi/agent` | Shared writable settings, models, credentials, and resources |
 | `data/gh-config/` | `/run/gh-config` (read-only) | Optional GitHub CLI credentials, shared across instances |
-| `data/sessions/<name>-<path-hash>/` | `/pi/sessions` | Writable session storage selected by the launcher |
+| `data/sessions/<name>-<path-hash>/` | `/pi/sessions` (Herdr: `/pi/herdr-sessions/<key>`) | Writable session storage selected by the launcher |
+| `data/herdr-launches/` | Not separately mounted | Private workspace/storage records for optional Herdr restore |
 | Selected project | `/workspace` | Writable project files |
 | `~/.gitconfig` | `/home/node/.gitconfig` | Read-only Git settings |
 | Model store selected in `data/ollama.env` | `/models` in Ollama | Persistent model files |
@@ -67,7 +69,7 @@ Build the Pi image before running the launcher:
 
 ```bash
 chmod +x setup/bin/pi
-docker build -t pi-agent:latest ./setup/pi
+./setup/pi/build-pi-docker.sh
 ```
 
 The launcher checks for this image and prints the build command if it is missing.
@@ -89,7 +91,29 @@ pi -- --version
 ```
 
 The launcher resolves symlinks to find this repository, independently of the
-current workspace.
+current workspace. `pi --help` shows launcher usage without requiring Docker;
+`pi -- --help` opens Pi's own help through Docker.
+
+### Optional Herdr integration
+
+Install Herdr on the host, then launch `pi /absolute/path/to/project` inside a
+Herdr pane. Eligible interactive launches automatically install/update its
+official Pi extension and bundled operating skill in this deployment's shared
+configuration and enable support.
+To install/update explicitly instead:
+
+```bash
+./setup/bin/herdr-extension install
+```
+
+Extension/skill preparation needs no image rebuild. The container Herdr CLI is
+installed from the version pinned in `setup/pi/build-pi-docker.sh`; rebuild and
+start new containers when updating the pin. Potential host/server/container
+version mismatches are accepted without a runtime synchronization check. Enabled launches print a socket-access notice.
+Use `--no-herdr` to prevent installation and socket exposure, or `--herdr` to
+require integration rather than warn and fall back on preparation failure. See
+[Herdr integration](HERDER_INTEGRATION.md) for requirements, updates/removal,
+restore, diagnostics, and socket security.
 
 ## Security and concurrency
 
@@ -108,6 +132,10 @@ current workspace.
   same checkout. Use separate Git worktrees for concurrent writing agents.
 - This is process/filesystem isolation, not a hardened sandbox. Agents can modify
   mounted projects and reach services on the shared Docker network.
+- Optional [Herdr mode](HERDER_INTEGRATION.md) exposes Herdr's full local control
+  socket, including control of other panes. Use it only with trusted containers;
+  eligible interactive launches inside Herdr enable it automatically with a
+  notice. Use `--no-herdr` to prevent installation and socket exposure.
 - No Docker socket is mounted and Docker is not installed in the Pi image.
   Rebuilds and container management are host-side operations.
 - Provider compatibility and OAuth availability depend on upstream releases and

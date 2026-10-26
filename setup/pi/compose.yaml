@@ -11,11 +11,11 @@ services:
       EDITOR: nano
       VISUAL: nano
       PI_CODING_AGENT_DIR: /pi/agent
-      PI_CODING_AGENT_SESSION_DIR: /pi/sessions
+      PI_CODING_AGENT_SESSION_DIR: "${PI_SESSION_TARGET:-/pi/sessions}"
       GH_CONFIG_DIR: /run/gh-config
     volumes:
       - ${PI_CONFIG:?}:/pi/agent
-      - ${PI_SESSIONS:?}:/pi/sessions
+      - ${PI_SESSIONS:?}:${PI_SESSION_TARGET:-/pi/sessions}
       - ${PI_WORKSPACE:?}:/workspace
       - ${HOME}/.gitconfig:/home/node/.gitconfig:ro
       - type: bind

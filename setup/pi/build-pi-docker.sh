@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Update these together with the host Herdr installation when upgrading.
+readonly PI_VERSION=1.4.0
+readonly HERDR_VERSION=0.9.5
+context="$(dirname -- "$(realpath -- "${BASH_SOURCE[0]}")")"
+
+printf 'Building with Pi v%s and Herdr v%s integration.\n' "$PI_VERSION" "$HERDR_VERSION"
+exec docker build "$@" \
+  --build-arg "PI_VERSION=$PI_VERSION" \
+  --build-arg "HERDR_VERSION=$HERDR_VERSION" \
+  --tag pi-agent:latest \
+  "$context"
