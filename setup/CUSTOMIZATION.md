@@ -28,25 +28,13 @@ automatic Python downloads; use the image-provided interpreter.
 
 ### Herdr-managed exception
 
-The official `herdr-agent-state.ts` is managed by host Herdr in
-`data/config/extensions/` and discovered by Pi at `/pi/agent/extensions/`.
-It is not an image-managed npm package and must not be vendored or modified
-here; it remains inactive without Herdr context. Eligible interactive launches
-inside Herdr automatically check upstream status and install/update when needed.
-The same locked preparation installs the bundled operating skill at
-`data/config/skills/herdr/SKILL.md` (container `/pi/agent/skills/herdr/SKILL.md`).
-It refreshes only when missing/empty or the selected host Herdr version changes;
-there are no shared-settings edits or per-launch skill rewrites. Use `/reload`
-to discover a newly installed skill in an existing Pi session.
-
-The official Herdr CLI is image-managed for amd64/arm64. Its version and Pi's
-version are pinned in the host `setup/pi/build-pi-docker.sh` script. Rebuild the image and start new containers to update it; the host
-CLI and its bundled skill are updated separately on the host. This slice assumes
-upstream compatibility when host and image versions differ.
-
-Use `--no-herdr` to prevent that preparation and socket exposure. See
-[Herdr installation and updates](HERDER_INTEGRATION.md#scope-and-installation)
-for the host installer, update, and removal workflow.
+Host Herdr manages the official `herdr-agent-state.ts` reporter and operating
+skill under `data/config/`; do not vendor or modify them. Integrated launches
+prepare these resources automatically. The container CLI is image-managed;
+the Docker-Pi helper skill lives in `setup/skills/docker-pi-herdr/` and is loaded
+by the launcher. See [Herdr maintenance](HERDER_INTEGRATION.md#maintenance-and-diagnostics)
+for updates, removal and process refresh requirements. Use `--no-herdr` to skip
+preparation and socket exposure.
 
 ### Subscription usage extension
 
