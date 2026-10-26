@@ -7,7 +7,8 @@ cloud providers.
 Eligible interactive launches inside a Herdr pane automatically enable the
 official Pi integration and Herdr operating skill. Existing agents can communicate
 through the official CLI; the prompt/wait/read exchange has passed host acceptance.
-Sibling helper creation is the next step, not yet validated.
+Sibling helper creation has a Docker-specific upstream-CLI recipe; live host
+validation is the next step.
 Use `--no-herdr` to disable integration or `--herdr` to require it.
 
 ## Get started

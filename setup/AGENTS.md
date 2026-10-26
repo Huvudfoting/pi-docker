@@ -34,6 +34,21 @@ Read only the relevant mounted guide; do not search `/workspace` for these docs:
   other panes; the pane ID is not an access restriction. Stopping the entire
   session still requires an explicit user request.
 
+## Sibling Docker-Pi helpers
+- Before creating a helper, read the sibling recipe in
+  `/opt/pi-docker/HERDER_INTEGRATION.md` and the official Herdr skill.
+- Integrated launches expose `PI_DOCKER_HOST_WORKSPACE`, the selected host
+  project root. Use it for the sibling's host cwd and explicit launcher workspace;
+  never substitute container `$PWD` or `/workspace`. If missing, start a fresh
+  integrated container rather than guessing. Helpers start at the project root,
+  even if the caller has changed to a subdirectory.
+- Host `pi` must resolve to this deployment's launcher in new pane shells.
+  Use upstream split/start commands with `--no-focus`, a returned pane ID, a
+  unique helper name/storage selection, and explicit `--herdr`. Do not replay
+  the caller's conversation or CLI flags. Separate storage does not isolate files.
+- Keep waits/reads bounded. Preserve the created pane ID on failure; inspect
+  before retrying and do not automatically close panes or the session.
+
 ## Herdr shutdown
 When explicitly asked to stop the entire connected Herdr session, use
 `/opt/pi-docker/bin/stop-herdr` through the shell tool. This stops all panes

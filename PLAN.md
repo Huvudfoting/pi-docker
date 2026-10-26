@@ -13,8 +13,10 @@ The subsequent automatic detection/extension preparation and container-side
 shutdown changes have local test coverage, but still need host validation.
 The user has also reported a successful live agent-to-agent `ok` exchange:
 shared skill discovery, container CLI session access, peer execution, bounded
-wait, and response retrieval all passed. This does not validate sibling creation
-or every reporting/restore/shutdown regression. Compatibility depends on the
+wait, and response retrieval all passed. Sibling creation subsequently succeeded
+on retry after an improvised host-shell verification likely closed the first
+created pane. This does not establish dependable repetition or every
+reporting/restore/shutdown regression. Compatibility depends on the
 deployed Herdr and Pi releases retaining the reviewed behavior.
 
 This file records architecture, implementation constraints, validation, and
@@ -22,17 +24,18 @@ remaining work. Durable user instructions live in
 [the Herdr guide](setup/HERDER_INTEGRATION.md), with general deployment details
 in [SETUP.md](setup/SETUP.md) and [CUSTOMIZATION.md](setup/CUSTOMIZATION.md).
 
-## Communication passed; next step: sibling Docker-Pi helper creation
+## Next: dependable communication and creation through a focused skill + script
 
-**Existing-agent communication is implemented and host acceptance passed
-(user-reported).** The next slice is letting Agent A create a sibling pane and
-start a fresh Docker-Pi Agent B in the intended host project without stealing
-focus, then reuse the validated prompt/wait/read exchange.
+**Existing-agent communication and a sibling retry succeeded (user-reported).**
+The recipe alone left room for unsafe agent improvisation. The next implementation
+is a focused Docker-Pi skill backed by a deterministic Python script with `start`
+and `ask` operations, using the official Herdr CLI. This is planned, not yet
+implemented. Repeated success and controlled failure handling come before worktrees.
 
 Follow [AGENT_COMMUNICATION_PLAN.md](AGENT_COMMUNICATION_PLAN.md) for completed
-results, settled version policy, and the next implementation handoff. The key
-remaining adaptation is host launch context: container `/workspace` is not the
-host project path. Use the official CLI/skill, not a Pi subagent extension or
+results, settled version policy, and the host acceptance handoff. Integrated
+Compose now forwards the resolved host project as `PI_DOCKER_HOST_WORKSPACE`;
+container `/workspace` is not the host project path. Use the official CLI/skill, not a Pi subagent extension or
 separate messaging system. Herdr Git worktree integration follows this slice.
 
 ## Settled design
@@ -196,6 +199,12 @@ The override forwards `HERDR_ENV=1`, the current `HERDR_PANE_ID`, and
 `HERDR_SOCKET_PATH=/run/herdr/herdr.sock`, binding the exact current host socket
 there. Missing bind sources must fail rather than be created. The host
 `HERDR_BIN_PATH` is not needed inside the container: reporting uses direct IPC.
+The same override forwards `PI_DOCKER_HOST_WORKSPACE` from the launcher's resolved
+`PI_WORKSPACE`, including on restore. It is the selected host project root, not
+container cwd. Ordinary/opt-out containers do not receive it. The Docker-specific
+sibling recipe uses it for split cwd and explicit launcher workspace; a unique
+helper alias selects separate conversation storage. Host `pi` must still resolve
+to this deployment in new pane shells. No new mounts or helper manager were added.
 
 Retain interactive stdin/TTY, `init: true`, caller UID/GID, dropped capabilities,
 `no-new-privileges`, signals, exit-status propagation, and disposable-container
@@ -297,7 +306,7 @@ A missing launch record is normal before the first enabled launch.
 - The user reported the earlier core host launch-and-restore trial succeeded:
   wrapper identification, official state/session reporting, and restoration to
   the same workspace/storage/conversation worked in that deployment.
-- The local suite has 29 fake-Docker/fake-Herdr and temporary-socket tests. It
+- The local suite has 31 fake-Docker/fake-Herdr and temporary-socket tests. It
   covers automatic current/missing/outdated preparation, unchanged current
   extensions, executable/configuration targeting, malformed status, opt-out,
   ineligible invocations, strict restore failures, auto fallback, read-only
@@ -305,6 +314,9 @@ A missing launch record is normal before the first enabled launch.
   ambiguous-outcome handling without retries. Added coverage includes shared
   skill refresh/no-op/concurrency/failure-safe publication/removal, and build
   wrapper pins, path quoting, argument forwarding, and exit-status propagation.
+  Sibling coverage asserts the integrated-only host-root binding contract,
+  canonical path selection, explicit separate helper storage, and restored root.
+  Fake Docker does not evaluate Compose interpolation or test live helper startup.
 - The user reported all live communication acceptance criteria passed: skill
   discovery, CLI access to the connected session, peer execution of
   `Answer only ok`, bounded wait, and retrieval of `ok`. Helper creation and
@@ -342,13 +354,18 @@ Use a disposable named session so restart/shutdown cannot affect real work:
 
 ## Remaining work and non-goals
 
-- **Next: sibling Docker-Pi helper creation.** Existing-agent CLI/skill
-  communication passed host acceptance. Follow the handoff in
-  [AGENT_COMMUNICATION_PLAN.md](AGENT_COMMUNICATION_PLAN.md): create a sibling
-  without focus theft, launch Docker-Pi with validated host project/storage
-  context, and repeat the `ok` exchange. No review workflow is required.
-- **Subsequent: Herdr Git worktree integration.** Explore Herdr's worktree
-  support for isolated, concurrent editing agents after helper creation works.
+- **Next: focused Docker-Pi skill + script.** Implement the narrow deterministic
+  `start`/`ask` workflow planned in
+  [AGENT_COMMUNICATION_PLAN.md](AGENT_COMMUNICATION_PLAN.md), with structured
+  partial-failure results, bounded operations, and no blind retries or interactive
+  shell verification. Keep upstream CLI/skill/reporting unchanged. No Pi tool or
+  extension is planned yet; candidate research is informational, not installation.
+  See [HERDR_EXTENSION_RESEARCH.md](HERDR_EXTENSION_RESEARCH.md) for the ranked
+  alternatives and findings; the skill + script plan remains unchanged and is
+  not implemented. Validate repeated host cycles and controlled failures before
+  claiming dependability.
+- **Subsequent: Herdr Git worktree integration.** Deferred until communication
+  and creation have dependable, tested behavior, not just one successful retry.
 - **Questionnaire blocked-state adapter — deferred at the user's request.**
   `@juicesharp/rpiv-ask-user-question` emits `rpiv:ask-user:blocked`, whereas the
   official reporter consumes `herdr:blocked`. If implemented, bridge balanced

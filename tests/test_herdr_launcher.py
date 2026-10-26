@@ -431,6 +431,44 @@ class HerdrLauncherTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(invocation["args"][-1], "--help")  # Pi help, not launcher help.
 
+    def test_host_workspace_binding_is_scoped_to_integrated_compose(self):
+        # Contract check: the fake Docker CLI does not evaluate Compose YAML.
+        # The override consumes the launcher's resolved PI_WORKSPACE; there is
+        # no passthrough from a possibly stale PI_DOCKER_HOST_WORKSPACE value.
+        override = (self.setup / 'pi/compose.herdr.yaml').read_text()
+        base = (self.setup / 'pi/compose.yaml').read_text()
+        self.assertIn('      PI_DOCKER_HOST_WORKSPACE: "${PI_WORKSPACE:?}"', override)
+        self.assertNotIn('PI_DOCKER_HOST_WORKSPACE', base)
+        alias = self.root / 'project alias'
+        alias.symlink_to(self.project, target_is_directory=True)
+        for args, patch, integrated in (
+            ((), {}, True),
+            (('--herdr',), {}, True),
+            (('--no-herdr',), {}, False),
+            ((), {'HERDR_ENV': '', 'HERDR_PANE_ID': '', 'HERDR_SOCKET_PATH': ''}, False),
+            ((), {'HERDR_EXIT': '23'}, False),
+        ):
+            with self.subTest(args=args, patch=patch):
+                result, invocation = self.launch(alias, '--name', 'backend', *args, env={
+                    **self.env, 'PI_WORKSPACE': '/stale/project',
+                    'PI_DOCKER_HOST_WORKSPACE': '/stale/host/project', **patch,
+                })
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(invocation['env']['PI_WORKSPACE'], str(self.project))
+                self.assertEqual(str(self.setup / 'pi/compose.herdr.yaml') in invocation['args'], integrated)
+
+    def test_sibling_selection_has_explicit_project_and_separate_storage(self):
+        original = self.initial_launch()
+        helper = 'helper-a1b2c3'
+        result, sibling = self.launch(self.project, '--name', helper, '--herdr', cwd=self.other)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(sibling['env']['PI_WORKSPACE'], original['env']['PI_WORKSPACE'])
+        self.assertNotEqual(sibling['env']['PI_SESSIONS'], original['env']['PI_SESSIONS'])
+        self.assertNotEqual(sibling['env']['PI_SESSION_TARGET'], original['env']['PI_SESSION_TARGET'])
+        self.assertIn(str(self.setup / 'pi/compose.herdr.yaml'), sibling['args'])
+        self.assertNotIn('--name', sibling['args'])  # Consumed by host launcher, not Pi.
+        self.assertNotIn('--herdr', sibling['args'])
+
     def test_herdr_record_publication_leaves_no_temporary_files(self):
         first = self.initial_launch()
         self.initial_launch()  # Reusing the same selection must be idempotent.
@@ -451,7 +489,8 @@ class HerdrLauncherTest(unittest.TestCase):
         filename = "2026-01-01T12-00-00-000Z_example.jsonl"
         (Path(original["env"]["PI_SESSIONS"]) / filename).touch()
         reference = f"{target}/{filename}"
-        fresh = {**self.env, "HERDR_PANE_ID": "w2:p3", "HERDR_SOCKET_PATH": str(self.make_socket("new.sock")), "DOCKER_EXIT": "17"}
+        fresh = {**self.env, "HERDR_PANE_ID": "w2:p3", "HERDR_SOCKET_PATH": str(self.make_socket("new.sock")),
+                 "PI_WORKSPACE": str(self.other), "PI_DOCKER_HOST_WORKSPACE": "/stale/project", "DOCKER_EXIT": "17"}
         result, restored = self.launch("--session", reference, env=fresh, cwd=self.root)
         self.assertEqual(result.returncode, 17, result.stderr)  # exec preserves exit status
         for key in ("PI_WORKSPACE", "PI_SESSIONS", "PI_SESSION_TARGET"):
@@ -459,6 +498,9 @@ class HerdrLauncherTest(unittest.TestCase):
         self.assertEqual(restored["env"]["HERDR_PANE_ID"], "w2:p3")
         self.assertEqual(restored["env"]["HERDR_SOCKET_HOST_PATH"], fresh["HERDR_SOCKET_PATH"])
         self.assertEqual(restored["env"]["HERDR_AGENT"], "pi")
+        # Integrated Compose maps this recovered root into PI_DOCKER_HOST_WORKSPACE.
+        self.assertIn(str(self.setup / 'pi/compose.herdr.yaml'), restored['args'])
+        self.assertEqual(restored['env']['PI_WORKSPACE'], str(self.project))
         self.assertEqual(restored["args"][-2:], ["--session", reference])
 
     def test_missing_or_out_of_scope_restore_fails_without_launching(self):

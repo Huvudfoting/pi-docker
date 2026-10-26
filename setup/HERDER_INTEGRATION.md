@@ -107,15 +107,109 @@ skill for normal CLI operation. Also smoke-test reporting, native restore,
 ordinary launches, and `--no-herdr` after rebuilding; the successful `ok` exchange
 does not establish those regressions passed.
 
-### Next: creating a helper
+## Creating a sibling Docker-Pi helper
 
-A helper is another ordinary Docker-Pi instance in a sibling Herdr pane. The next
-slice will let an existing agent create that pane without focus theft, start
-Docker-Pi in the intended host project, then reuse this exchange. This is not a
-Pi subagent extension or nested Docker launch. Host path translation is still to
-be implemented: container `/workspace` must not be used as the host project path.
-Automatic sibling creation is not yet validated; see
-[the implementation handoff](../AGENT_COMMUNICATION_PLAN.md).
+**Implemented; live host acceptance pending.** A helper is another ordinary
+Docker-Pi instance in a sibling Herdr pane, not a Pi subagent extension or nested
+Docker launch. Creation uses the official CLI/skill, without a custom tool.
+
+### Host workspace and prerequisites
+
+New integrated containers receive `PI_DOCKER_HOST_WORKSPACE` from the launcher's
+resolved `PI_WORKSPACE`. Native restore uses the recovered project root. The
+variable is forwarded only by the Herdr Compose override; ordinary and
+`--no-herdr` containers do not receive it. This adds no mounts or record access.
+It is the **selected host project root**, not a translation of the agent's current
+subdirectory. Never use container `$PWD` or `/workspace` as the host path, or test
+that the host path exists inside the container. If the variable is missing,
+start a fresh integrated container; do not guess a path.
+
+Host `pi` must resolve to this deployment's `setup/bin/pi` launcher in newly
+created shell panes, just as native restore requires. Check the launcher symlink
+on the host and account for shell startup files changing PATH. `--kind pi` alone
+cannot distinguish Docker-Pi from a host-native Pi installation. Verify this
+prerequisite before startup; do not silently fall back to a different executable.
+
+### Upstream split/start recipe
+
+First read the official skill and inspect the calling pane:
+
+```bash
+herdr pane layout --pane "$HERDR_PANE_ID"
+herdr agent list
+```
+
+Choose `right` for a wide pane, `down` for a narrow/tall one (or honor the user's
+requested direction). Choose a unique live helper name, also used as its storage
+name. Run the following in one Bash invocation **after inspecting geometry**;
+stop on any failure and retain any created pane ID:
+
+```bash
+set -euo pipefail
+test "${HERDR_ENV:-}" = 1
+test -n "${HERDR_PANE_ID:-}"
+test -S "${HERDR_SOCKET_PATH:-}"
+: "${PI_DOCKER_HOST_WORKSPACE:?Start a fresh integrated Docker-Pi container}"
+case "$PI_DOCKER_HOST_WORKSPACE" in /*) ;; *) exit 2 ;; esac
+
+direction=right  # Set right/down from the layout inspected above.
+helper="helper-$(python3 -c 'import secrets; print(secrets.token_hex(4))')"
+printf 'Helper name and storage: %s\n' "$helper"
+
+split="$(herdr pane split --current --direction "$direction" \
+  --cwd "$PI_DOCKER_HOST_WORKSPACE" --no-focus)"
+printf '%s\n' "$split"
+pane_id="$(printf '%s\n' "$split" | python3 -c \
+  'import json, sys; p = json.load(sys.stdin)["result"]["pane"]["pane_id"]; assert isinstance(p, str) and p; print(p)')"
+printf 'Created helper pane: %s\n' "$pane_id"
+
+herdr agent start "$helper" --kind pi --pane "$pane_id" --timeout 120000 \
+  -- "$PI_DOCKER_HOST_WORKSPACE" --name "$helper" --herdr
+herdr agent get "$helper"
+herdr agent prompt "$helper" "Answer only ok" --wait --timeout 120000
+herdr agent read "$helper" --source recent-unwrapped --lines 40
+```
+
+Start only in the new, available shell pane; do not target an occupied pane.
+Herdr's startup command checks readiness. Capture identity from successful server
+responses, not guessed IDs or sidebar positions. If a randomly generated name
+collides, inspect state and deliberately select another unused name rather than
+renaming an existing agent.
+
+Workspace is the first launcher argument; `--name` selects distinct persistent
+conversation storage and `--herdr` requires integration instead of an ordinary
+fallback. Quote each argument as shown; do not construct a shell command string
+or use `eval`. A helper starts a fresh conversation with normal configured
+defaults. Do not replay the caller's CLI flags or session arguments.
+
+If split/start/prompt fails or times out, inspect layout, the returned pane, and
+current agent state before retrying. The operation may have partially succeeded.
+Do not automatically create another pane, resend input, or close anything. Leave
+a successful helper running as well. No workspaces, tabs, worktrees, or automatic
+cleanup are part of this slice. Both agents share the project filesystem:
+**separate conversation storage does not isolate edits**.
+
+### Disposable host acceptance
+
+No image rebuild is needed for this Compose/instruction change when the existing
+image already contains the CLI. Start a **fresh integrated caller container** so
+it receives the variable and updated instructions. Use a disposable Herdr session.
+
+Ask Agent A to create one sibling Docker-Pi helper using this recipe, ask it
+`Answer only ok`, and read the response. Verify:
+
+1. Exactly one sibling is created and user focus stays in the caller.
+2. The new pane actually runs Docker-Pi, not a host-native Pi; verify the shell's
+   `pi` resolution on the host before startup and inspect the resulting container.
+3. The helper selects the same intended host project, including paths with spaces
+   or quotes, with a different conversation-storage selection.
+4. Startup, prompt, bounded wait, and retrieval of `ok` succeed.
+5. The helper is left running and unrelated panes/session remain untouched.
+
+Also recheck reporting, native restore, ordinary launches, and `--no-herdr`.
+Local tests cover the Compose binding contract and launcher selection/restore,
+not actual Compose execution, new-shell PATH, focus, or live startup. See
+[the implementation handoff](../AGENT_COMMUNICATION_PLAN.md) for progress.
 
 ## Sessions and restore
 

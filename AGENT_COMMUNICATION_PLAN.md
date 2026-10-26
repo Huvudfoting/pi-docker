@@ -1,7 +1,9 @@
 # Agent-to-agent communication through Herdr
 
 **Status: existing-agent communication implemented and host acceptance passed
-(user-reported). Next: sibling Docker-Pi helper creation.**
+(user-reported). Sibling creation succeeded on retry (user-reported), but the
+recipe is not dependable enough. Next: focused Docker-Pi skill + script;
+planning only, not implemented.**
 
 This extends [PLAN.md](PLAN.md). Durable usage instructions live in
 [the Herdr guide](setup/HERDER_INTEGRATION.md). Herdr Git worktree integration
@@ -10,7 +12,8 @@ remains a subsequent, separate step.
 ## Completed slice
 
 Use Herdr's official CLI plus operating skill, not a Pi subagent extension,
-message bus, custom CLI wrapper, or second lifecycle reporter.
+message bus, replacement CLI, or second lifecycle reporter. A narrow
+Docker-specific workflow adapter is now planned below.
 
 - `setup/pi/build-pi-docker.sh` pins Pi **1.4.0** and Herdr **0.9.5** and passes
   both versions into the Dockerfile. The official Linux CLI supports amd64 and
@@ -38,7 +41,7 @@ an individual container's version.
 
 ### Validation completed
 
-- **29 local tests pass:** launcher/preparation, skill version refresh and no-op,
+- **31 local tests pass:** launcher/preparation, skill version refresh and no-op,
   concurrent preparation, failure-safe skill publication, removal, disabled
   launches, build-wrapper pins/path quoting/argument forwarding/exit status,
   restore logic, and shutdown protocol fixtures.
@@ -50,13 +53,14 @@ an individual container's version.
   peer prompt delivery and execution, bounded wait, and response retrieval.
   Agent A asked an existing idle Agent B `Answer only ok`, and read back `ok`.
 
-The successful live exchange does not establish helper creation, worktree
-support, exhaustive timeout/replacement/exit behavior, or every core regression.
+The initial live exchange did not establish helper creation. The subsequent
+sibling test succeeded on retry, as recorded below. Neither test establishes
+worktree support, exhaustive timeout/replacement/exit behavior, or every core regression.
 It is not a review-workflow or file-isolation test. Exact host/server versions
 and terminal logs were not recorded in this handoff; image pins are not evidence
 of the running server version.
 
-## Next slice: create a sibling Docker-Pi helper
+## Sibling Docker-Pi helper slice: recipe implemented, success reported on retry
 
 A "helper" is another ordinary Docker-Pi instance in a sibling Herdr pane,
 started by the calling agent instead of manually by the user. It is not an
@@ -83,17 +87,20 @@ workspace, or tab is required.
 container. Container `$PWD` is typically `/workspace`; do not pass that blindly
 as host `--cwd` or as the Docker-Pi workspace argument.
 
-Before implementing, establish a narrow, validated way to obtain the selected
-host project path and confirm host `pi` resolves to this deployment's launcher.
-Inspect the existing launcher selection, Compose environment, and launch records
-before adding metadata. Do not expose all launch records, the host filesystem,
-credentials, or a host shell bridge just to obtain one project path.
+Implemented the narrow adaptation in `setup/pi/compose.herdr.yaml`:
+`PI_DOCKER_HOST_WORKSPACE: "${PI_WORKSPACE:?}"`. The host launcher already exports
+its resolved workspace; native restore recovers that value before launch. No
+launcher changes, new mounts, files, or launch-record access were necessary. The
+base service does not forward the variable, so ordinary/opt-out launches remain
+unchanged. It is project-root metadata, not current-subdirectory translation.
 
-Pass workspace and storage selection explicitly where needed. Preserve spaces,
-quotes, argument boundaries, and launcher-option order; host shell cwd must not
-accidentally select another project. Decide how the helper's storage name is
-selected using the existing launcher semantics, rather than inventing a separate
-session manager.
+The Docker-specific recipe lives in `setup/HERDER_INTEGRATION.md`, linked from
+`setup/AGENTS.md`. It uses the host root for split cwd and the explicit first
+launcher argument, a unique helper alias as `--name` for separate conversation
+storage, and `--herdr` to require integration. It does not replay caller flags or
+sessions. Host `pi` resolving to this deployment's launcher in new shell panes
+remains an installation prerequisite and live acceptance check; no new host
+execution bridge or executable-resolution enforcement was added.
 
 ### Use the upstream workflow
 
@@ -107,7 +114,8 @@ mutating commands by omitting arguments.
 - Start only in an available shell pane. Use a unique live agent name.
 
 ```bash
-herdr agent start <unique-name> --kind pi --pane <returned-pane-id> -- <launcher-args>
+herdr agent start <unique-name> --kind pi --pane <returned-pane-id> --timeout 120000 \
+  -- "$PI_DOCKER_HOST_WORKSPACE" --name <unique-name> --herdr
 herdr agent prompt <resolved-target> "Answer only ok" --wait --timeout 120000
 herdr agent read <resolved-target> --source recent-unwrapped --lines 40
 ```
@@ -117,11 +125,19 @@ These are templates, not assumed existing identities. `--kind pi` selects host
 
 ### Tests and handoff checklist
 
-- Local tests: any launch-context propagation, host-path selection, paths with
-  spaces/quotes, explicit storage selection, and unchanged ordinary/opt-out
-  launches. Do not build a custom message protocol just to mock the CLI.
-- Host acceptance: disposable session, one new sibling, correct project and
-  Docker-Pi identity, focus preserved, `ok` exchange succeeds.
+- Local coverage added: Compose binding scoped to the Herdr override, resolved
+  host root via a symlink and spaces/quotes, stale inherited metadata not used by
+  the binding, distinct explicit helper storage, and restored root selection.
+  Tests use fake Docker and assert the binding contract; they do not evaluate
+  actual Compose interpolation or start a helper.
+- The first attempt created a pane successfully, then added a host-shell
+  verification command with `set -e` and an invalid path comparison. The pane
+  subsequently disappeared. The likely cause was termination of its interactive
+  shell; the captured result did not establish the exact exit cause.
+- The user reported the retry worked perfectly after removing that added command.
+  This demonstrates the upstream split/start/exchange can work, not that an
+  agent-reconstructed recipe is reliable. The immediate next step is the
+  deterministic adapter below, not worktrees.
 - Inspect startup failures before retrying or creating another pane; the first
   operation may have partially succeeded. No automatic pane/session cleanup.
 - Recheck reporting, native restore, and ordinary/`--no-herdr` launches when
@@ -131,6 +147,124 @@ These are templates, not assumed existing identities. `--kind pi` selects host
 The implementation is currently an uncommitted working-tree change set. Preserve
 existing user changes, including the broader core plan. No further live session
 control is implied by this documentation handoff.
+
+## Next implementation: focused Docker-Pi skill + script
+
+**Decision: retain this plan. Do not implement it as part of the current planning
+and extension research task.** One successful retry is not a dependability claim.
+Worktree integration remains deferred until this workflow is dependable.
+
+### Structure and ownership
+
+Proposed deployment-owned layout in the existing read-only mount:
+
+```text
+setup/skills/docker-pi-herdr/
+  SKILL.md
+  scripts/herdr-helper.py
+```
+
+- The skill owns routing, required inputs, interpretation, and deliberate recovery.
+- The Python script owns validated argument arrays, sequencing, bounded waits and
+  reads, and structured success/partial-failure results. Use the official CLI,
+  not a raw socket client, background supervisor, or new message protocol.
+- The official Herdr CLI/server retains agent identity and lifecycle authority.
+- Keep the shared official `herdr` skill and reporting extension unchanged.
+- Plan to load the Docker-specific skill explicitly on integrated launches; check
+  installed Pi discovery/trust/argument behavior before implementation. Do not
+  rewrite shared configuration or copy a second upstream skill on every launch.
+
+The Docker-specific skill and a short `AGENTS.md` routing rule should direct
+Docker-Pi sibling startup and the supported peer exchange through the script,
+not a reconstructed command recipe. General inspection remains with the official
+Herdr skill/CLI. The skills are complementary, not competing operating manuals.
+No Pi extension/tool yet; a future thin tool must reuse this implementation if
+actual invocation problems justify it.
+
+### Minimal executable surface
+
+- **start**: validate integrated context, host-root metadata, name and direction;
+  check alias availability before mutation; split with explicit host cwd and
+  `--no-focus`; retain the returned pane ID immediately; start through upstream
+  `agent start` with exact workspace/`--name`/`--herdr` arguments and a bounded
+  startup timeout; return current agent identity and pane ID.
+- **ask**: resolve an explicit live target, require idle/readiness for this
+  workflow, submit once with upstream `agent prompt --wait --timeout`, inspect
+  settled state, and read bounded output through the agent surface. Return state
+  and output, not a fabricated task-level completion guarantee.
+
+Host `pi` resolving to Docker-Pi in new shell panes remains a prerequisite.
+Do not infer deployment location from the project root or assume container
+metadata exists in the host shell. Do not run improvised verification, `set -e`,
+`exit`, or other command strings in the sibling's interactive shell. The script
+must not use `pane run`/raw key injection for ordinary startup or peer prompts.
+
+### Failure contract
+
+Return structured outcomes with operation/stage, known pane and agent identities,
+upstream error code/message, and delivery uncertainty where applicable. Preserve
+upstream distinctions; connection errors are not evidence that a pane vanished.
+Bound subprocess execution as well as upstream waits. Cancellation/transport loss
+after mutation or submission may leave partial success: report uncertainty.
+
+No blind retries, automatic resend, pane deletion, replacement helpers, automatic
+approvals, or host/server upgrades. Preserve created IDs on subsequent failures.
+A timed-out/stalled prompt may already have been delivered. A lifecycle wait is
+not task-scoped RPC; the caller must interpret returned state and response.
+
+### Dependability acceptance before moving on
+
+- Local command-contract tests: exact arguments/order, paths with spaces/quotes,
+  invalid context/inputs, duplicate names, malformed responses, split/start/read
+  failures, busy targets, timeout/cancellation, and partial/uncertain outcomes.
+- Assert no focus theft, raw shell submission, automatic close, or duplicate
+  prompt delivery. Persist no private pane-alias/lifecycle database by default.
+- Repeated disposable-host start/ask cycles, both directions and quoted project
+  paths, plus controlled failure cases and reporting/restore/opt-out regressions.
+- Define success as predictable, bounded, recoverable behavior, not a promise
+  that server/process failures can never occur. Record observed test results.
+
+### External package review
+
+`@weshipwork/pi-herdr` **0.1.0** was inspected, not installed. It demonstrates a
+small official-CLI client, argument arrays, structured tool results, cancellation,
+focus-preserving splits, and bounded reads. It is not a drop-in adapter: no
+Docker host-path/storage/start adaptation, no agent prompt/start operations,
+raw pane command submission, pane-status polling, and some CLI syntax differs
+from Herdr 0.9.5 (`wait output`, `pane read --raw`). Its visible repository test
+coverage was metadata-only. It would not prevent the improvised verification
+failure. Learn from its client/result structure; do not adopt it or switch the
+skill + script plan on that basis.
+
+Further research found multiple alternatives. See
+[HERDR_EXTENSION_RESEARCH.md](HERDR_EXTENSION_RESEARCH.md) for the GitHub-star
+ranked shortlist, inspection depths, sources, and next-session handoff.
+`@ogulcancelik/pi-herdr` 0.4.1 is the closest narrow implementation reference:
+it exposes the actual upstream agent surface, but still lacks our atomic
+Docker-specific workflow and failure contract. Bellwether has useful documented
+partial-failure receipt ideas but a different socket/watch/mail architecture.
+The focused skill + script decision is unchanged. No candidate was installed,
+loaded, or adopted. The npm download window returned stale dates and was not
+used to claim current popularity.
+
+### Two implementation references to consult
+
+1. **[@ogulcancelik/pi-herdr 0.4.1](https://github.com/ogulcancelik/pi-extensions/tree/main/packages/pi-herdr)**
+   — reference for strict layout/pane/agent separation, argument-array CLI calls,
+   upstream agent startup/prompt/wait/read semantics, geometry selection, and
+   command-contract tests. The relevant published implementation was inspected;
+   repository tests were inspected but not run. Preserve our Docker-specific
+   start/ask workflow, bounded defaults, and structured failure contract rather
+   than adopting its broad tool surface.
+2. **[Pi Bellwether](https://github.com/joelhooks/pi-bellwether)**
+   — reference for stage-aware failure receipts, upstream error codes, submission
+   uncertainty, absolute deadlines, and small bounded diagnostics that never
+   replace the primary failure. These findings came from its documented contract,
+   not a complete source audit. Do not adopt its direct-socket/watch/mail stack.
+
+Consult both during design and test development, rechecking the referenced
+versions/source before borrowing patterns. They are learning references, not
+new dependencies or authorization to change the skill + script architecture.
 
 ## Coordination semantics to retain
 
