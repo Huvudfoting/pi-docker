@@ -34,20 +34,30 @@ Read only the relevant mounted guide; do not search `/workspace` for these docs:
   other panes; the pane ID is not an access restriction. Stopping the entire
   session still requires an explicit user request.
 
-## Sibling Docker-Pi helpers
-- Before creating a helper, read the sibling recipe in
-  `/opt/pi-docker/HERDER_INTEGRATION.md` and the official Herdr skill.
-- Integrated launches expose `PI_DOCKER_HOST_WORKSPACE`, the selected host
-  project root. Use it for the sibling's host cwd and explicit launcher workspace;
-  never substitute container `$PWD` or `/workspace`. If missing, start a fresh
-  integrated container rather than guessing. Helpers start at the project root,
-  even if the caller has changed to a subdirectory.
-- Host `pi` must resolve to this deployment's launcher in new pane shells.
-  Use upstream split/start commands with `--no-focus`, a returned pane ID, a
-  unique helper name/storage selection, and explicit `--herdr`. Do not replay
-  the caller's conversation or CLI flags. Separate storage does not isolate files.
-- Keep waits/reads bounded. Preserve the created pane ID on failure; inspect
-  before retrying and do not automatically close panes or the session.
+## Docker-Pi Herdr start/ask
+- This capability is a **skill + Python script**, not a registered Pi tool or
+  extension. Your existing `read` and shell tools are sufficient. For a matching
+  request, read `/opt/pi-docker/skills/docker-pi-herdr/SKILL.md` before concluding
+  the capability is unavailable. Do not stop after searching tools/extensions,
+  install a package, or ask the user to run Python because no Herdr tool exists.
+- When the user asks in ordinary language to open/split a Docker-Pi helper pane
+  or ask/contact/call another agent, read
+  `/opt/pi-docker/skills/docker-pi-herdr/SKILL.md` and execute its deterministic
+  `scripts/herdr-helper.py` start/ask workflow yourself through the shell tool.
+  Do not just show the user Python commands or require a skill slash command.
+  Integrated launches advertise this skill and append its full instructions to
+  the system prompt, so execution does not depend on the model discovering it.
+  If already present in context, apply them directly. General inspection and blank
+  terminal panes stay with the unchanged official Herdr skill/CLI; clarify a bare
+  “open/split a pane” when helper versus blank shell intent is unclear.
+- Startup requires `PI_DOCKER_HOST_WORKSPACE`, the selected host project root,
+  and host `pi` resolving to this deployment in new shells. Never substitute
+  container `$PWD` or `/workspace`, or submit improvised host-shell checks.
+  Missing metadata requires a fresh integrated container, not a guessed path.
+- Preserve structured receipts, known pane/agent IDs, and submission uncertainty.
+  No blind retries, resends, replacement helpers, or automatic pane cleanup.
+  Separate conversation storage does not isolate files; one outstanding request
+  per idle helper, with no concurrent senders.
 
 ## Herdr shutdown
 When explicitly asked to stop the entire connected Herdr session, use

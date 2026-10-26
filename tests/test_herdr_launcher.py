@@ -444,6 +444,7 @@ class HerdrLauncherTest(unittest.TestCase):
         for args, patch, integrated in (
             ((), {}, True),
             (('--herdr',), {}, True),
+            (('--herdr', '--', '--no-skills'), {}, True),
             (('--no-herdr',), {}, False),
             ((), {'HERDR_ENV': '', 'HERDR_PANE_ID': '', 'HERDR_SOCKET_PATH': ''}, False),
             ((), {'HERDR_EXIT': '23'}, False),
@@ -456,6 +457,16 @@ class HerdrLauncherTest(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(invocation['env']['PI_WORKSPACE'], str(self.project))
                 self.assertEqual(str(self.setup / 'pi/compose.herdr.yaml') in invocation['args'], integrated)
+                self.assertEqual('--skill' in invocation['args'], integrated)
+                eager_skill = '/opt/pi-docker/skills/docker-pi-herdr/SKILL.md'
+                self.assertEqual(eager_skill in invocation['args'], integrated)
+                self.assertEqual(invocation['args'].count('--append-system-prompt'), 2 if integrated else 1)
+                if integrated:
+                    index = invocation['args'].index('--skill')
+                    self.assertEqual(invocation['args'][index:index + 4], [
+                        '--skill', '/opt/pi-docker/skills/docker-pi-herdr',
+                        '--append-system-prompt', eager_skill,
+                    ])
 
     def test_sibling_selection_has_explicit_project_and_separate_storage(self):
         original = self.initial_launch()
@@ -502,6 +513,11 @@ class HerdrLauncherTest(unittest.TestCase):
         self.assertIn(str(self.setup / 'pi/compose.herdr.yaml'), restored['args'])
         self.assertEqual(restored['env']['PI_WORKSPACE'], str(self.project))
         self.assertEqual(restored["args"][-2:], ["--session", reference])
+        index = restored['args'].index('--skill')
+        self.assertEqual(restored['args'][index:index + 4], [
+            '--skill', '/opt/pi-docker/skills/docker-pi-herdr',
+            '--append-system-prompt', '/opt/pi-docker/skills/docker-pi-herdr/SKILL.md',
+        ])
 
     def test_missing_or_out_of_scope_restore_fails_without_launching(self):
         original = self.initial_launch()

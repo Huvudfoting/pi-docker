@@ -1,7 +1,12 @@
 # Pi–Herdr extension research and handoff
 
-**Decision unchanged: implement the focused Docker-Pi skill + Python script
-planned in [AGENT_COMMUNICATION_PLAN.md](AGENT_COMMUNICATION_PLAN.md). Research
+**Decision unchanged: focused Docker-Pi skill + Python script, now implemented
+and offline-tested as recorded in [AGENT_COMMUNICATION_PLAN.md](AGENT_COMMUNICATION_PLAN.md).
+Direct-script host steps 1–5 passed (user-reported), including controlled
+failures and regressions. Natural-language agent-operated acceptance is still
+model-dependent: cloud `gpt-5.6-luna` passed the supplied prompts (user-reported),
+and eager loading now works with Qwen3.8 but not Qwen3.6 (user-reported and
+accepted as success). This review remains research
 only: no candidate installed, loaded, executed, or adopted.**
 
 ## Discovery and ranking method
@@ -167,9 +172,23 @@ replacements for helper creation and are deliberately excluded from adoption.
 
 ## Next-session handoff
 
-The skill + script remains **planned, not implemented**. No dependency or
-configuration changes were made during research. For implementation, start with
-[the concrete workflow and failure contract](AGENT_COMMUNICATION_PLAN.md#next-implementation-focused-docker-pi-skill--script).
+The skill + script is now **implemented; direct-script host steps 1–5 passed
+(user-reported); natural-language workflow accepted with cloud `gpt-5.6-luna`
+and local Qwen3.8, but not working with Qwen3.6 (user-reported)**. Five
+happy-path receipts were reviewed; remaining script results are user-reported
+without additional receipts. Skill and AGENTS routing have been strengthened to
+make the agent execute open/split-helper/ask/contact requests itself. Routing
+wording alone failed locally, while forced skill invocation worked. The launcher
+now appends the same skill file to the integrated system prompt, avoiding
+model-selected discovery without adding a tool/extension. The user reports this
+works with Qwen3.8, not Qwen3.6, and accepts the focused slice as successful.
+Model labels are as supplied; this is not model-independent validation. No broader
+runtime is justified, and worktrees remain a separate follow-up.
+No dependency or configuration changes were made during the original research.
+Implementation reconsulted the published 0.4.1 source/contract tests and Bellwether
+failure/deadline/diagnostic contract; revision observations and offline results
+are recorded in
+[the implementation handoff](AGENT_COMMUNICATION_PLAN.md#implementation-validation-and-handoff).
 The best narrow source reference is `@ogulcancelik/pi-herdr` 0.4.1; Bellwether's
 documented partial-failure receipts are the best reliability-design reference
 from this screen. Preserve the official CLI/skill/reporting and keep broader

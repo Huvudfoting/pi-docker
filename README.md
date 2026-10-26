@@ -7,8 +7,13 @@ cloud providers.
 Eligible interactive launches inside a Herdr pane automatically enable the
 official Pi integration and Herdr operating skill. Existing agents can communicate
 through the official CLI; the prompt/wait/read exchange has passed host acceptance.
-Sibling helper creation has a Docker-specific upstream-CLI recipe; live host
-validation is the next step.
+A focused Docker-Pi skill + Python script now provides bounded `start`/`ask`
+workflows through that CLI, with partial-failure receipts and no automatic retries
+or cleanup. Offline contracts and direct-script host tests passed (user-reported).
+Natural-language open/split-helper/contact prompts passed with cloud model
+`gpt-5.6-luna` and, with eagerly loaded instructions, local **Qwen3.8**
+(user-reported and accepted). **Qwen3.6 did not work** for this workflow;
+model-independent reliability is not promised.
 Use `--no-herdr` to disable integration or `--herdr` to require it.
 
 ## Get started

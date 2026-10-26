@@ -115,6 +115,15 @@ prepare_environment() {
 }
 
 launch_pi() {
+  local skill_args=()
+  if ((herdr)); then
+    # Advertise the slash-command skill and eagerly provide the same instructions.
+    # Some models can execute a loaded skill but never discover it from metadata.
+    skill_args=(
+      --skill /opt/pi-docker/skills/docker-pi-herdr
+      --append-system-prompt /opt/pi-docker/skills/docker-pi-herdr/SKILL.md
+    )
+  fi
   exec docker compose "${compose_files[@]}" run --rm pi \
     --append-system-prompt /opt/pi-docker/AGENTS.md \
     --extension /usr/local/lib/node_modules/pi-rewind-hook/index.ts \
@@ -122,6 +131,7 @@ launch_pi() {
     --extension /usr/local/lib/node_modules/@juicesharp/rpiv-ask-user-question \
     --extension /usr/local/lib/node_modules/@specode/pi-subscription-usage \
     --extension /opt/pi-docker/extensions \
+    "${skill_args[@]}" \
     "${pi_args[@]}"
 }
 

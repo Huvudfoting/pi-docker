@@ -9,8 +9,10 @@ the session-wide socket access. `--no-herdr` disables integration; `--herdr`
 requires it. Native restore always requires integration and never falls back.
 
 The user previously reported a successful core host launch-and-restore trial.
-The subsequent automatic detection/extension preparation and container-side
-shutdown changes have local test coverage, but still need host validation.
+The subsequent focused start/ask acceptance is now also reported passed,
+including controlled failures, reporting/restore/opt-out/fallback regressions,
+and container-side shutdown. This is the user's host report, not an independent
+live retest or a new version-compatibility audit.
 The user has also reported a successful live agent-to-agent `ok` exchange:
 shared skill discovery, container CLI session access, peer execution, bounded
 wait, and response retrieval all passed. Sibling creation subsequently succeeded
@@ -24,13 +26,31 @@ remaining work. Durable user instructions live in
 [the Herdr guide](setup/HERDER_INTEGRATION.md), with general deployment details
 in [SETUP.md](setup/SETUP.md) and [CUSTOMIZATION.md](setup/CUSTOMIZATION.md).
 
-## Next: dependable communication and creation through a focused skill + script
+## Focused skill + script: accepted with cloud model and Qwen3.8
 
 **Existing-agent communication and a sibling retry succeeded (user-reported).**
 The recipe alone left room for unsafe agent improvisation. The next implementation
-is a focused Docker-Pi skill backed by a deterministic Python script with `start`
-and `ask` operations, using the official Herdr CLI. This is planned, not yet
-implemented. Repeated success and controlled failure handling come before worktrees.
+is now implemented: a focused Docker-Pi skill backed by a deterministic Python
+script with `start` and `ask`, using only official Herdr CLI argument arrays.
+It has offline contract/failure-path coverage. The user now reports host
+acceptance steps 1–3 completed; five reviewed receipts show two successful starts
+(right/down) and three serial acknowledged asks with stable identity and idle
+return. Local models misunderstood reply tokens, not the transport workflow.
+The user subsequently reported all remaining cases passed, completing controlled
+failures and regression checks (steps 4–5), plus shutdown. The shutdown command
+was clarified as direct execution or Node.js, not Python; no code fix is needed.
+The full repeated/quoted-root/geometry and failure/regression checks are
+user-reported; the five receipts alone do not document all of them. Worktree
+integration remains deferred: the user clarified these were direct Python
+calls. Subsequently, the user reports cloud model `gpt-5.6-luna` completed all
+natural-language prompts, with clarification on a follow-up helper name. A weaker
+local model looked only in tools/extensions and missed the skill. AGENTS now
+explicitly routes those requests to the skill via existing read/shell tools.
+Forced invocation worked locally; integrated launches now eagerly append the same
+skill instructions to remove that discovery dependency. The user reports the
+latest version works with **Qwen3.8**, but not **Qwen3.6**, and explicitly accepts
+this as success. The slice is complete for the demonstrated models, not a claim
+of universal local-model compatibility.
 
 Follow [AGENT_COMMUNICATION_PLAN.md](AGENT_COMMUNICATION_PLAN.md) for completed
 results, settled version policy, and the host acceptance handoff. Integrated
@@ -67,6 +87,7 @@ separate messaging system. Herdr Git worktree integration follows this slice.
 | Pinned Pi/Herdr image build | `setup/pi/build-pi-docker.sh`, `setup/pi/Dockerfile` |
 | Container context/socket mounts | `setup/pi/compose.herdr.yaml` |
 | Explicit session-wide shutdown | `setup/bin/stop-herdr` |
+| Docker-Pi sibling startup and idle-peer exchange | `setup/skills/docker-pi-herdr/SKILL.md`, `scripts/herdr-helper.py` |
 
 The libraries are sourced support code; sourcing creates no deployment state.
 The executable helper is independent of Docker and session-launch logic.
@@ -202,7 +223,7 @@ there. Missing bind sources must fail rather than be created. The host
 The same override forwards `PI_DOCKER_HOST_WORKSPACE` from the launcher's resolved
 `PI_WORKSPACE`, including on restore. It is the selected host project root, not
 container cwd. Ordinary/opt-out containers do not receive it. The Docker-specific
-sibling recipe uses it for split cwd and explicit launcher workspace; a unique
+start/ask script uses it for split cwd and explicit launcher workspace; a unique
 helper alias selects separate conversation storage. Host `pi` must still resolve
 to this deployment in new pane shells. No new mounts or helper manager were added.
 
@@ -329,11 +350,13 @@ Run the local suite without contacting a real Herdr server:
 python3 -m unittest discover -s tests -p 'test_*.py'
 ```
 
-These tests do not replace host validation of automatic preparation and shutdown.
-The prior core trial does not establish those subsequent changes or arbitrary
-Herdr/Pi version compatibility.
+These tests do not replace host validation. The user has now reported all
+focused start/ask host acceptance cases passed, including preparation fallback,
+reporting/restore/opt-out regressions and shutdown. No additional receipts or
+version inventory were supplied for those remaining cases; this does not prove
+arbitrary Herdr/Pi version compatibility or every installer transition.
 
-### Host validation still needed
+### Core host regression checklist
 
 Use a disposable named session so restart/shutdown cannot affect real work:
 
@@ -354,25 +377,43 @@ Use a disposable named session so restart/shutdown cannot affect real work:
 
 ## Remaining work and non-goals
 
-- **Next: focused Docker-Pi skill + script.** Implement the narrow deterministic
-  `start`/`ask` workflow planned in
-  [AGENT_COMMUNICATION_PLAN.md](AGENT_COMMUNICATION_PLAN.md), with structured
-  partial-failure results, bounded operations, and no blind retries or interactive
-  shell verification. Keep upstream CLI/skill/reporting unchanged. No Pi tool or
-  extension is planned yet; candidate research is informational, not installation.
-  See [HERDR_EXTENSION_RESEARCH.md](HERDR_EXTENSION_RESEARCH.md) for the ranked
-  alternatives and findings; the skill + script plan remains unchanged and is
-  not implemented. Validate repeated host cycles and controlled failures before
-  claiming dependability.
-- **Subsequent: Herdr Git worktree integration.** Deferred until communication
-  and creation have dependable, tested behavior, not just one successful retry.
+- **Focused slice accepted (user-reported): direct-script acceptance and
+  natural-language prompts with cloud `gpt-5.6-luna` and local Qwen3.8 passed.
+  Qwen3.6 remains a known non-working model for this workflow.**
+  The user reports script host steps 1–5 passed, but clarified these used Python
+  calls rather than natural-language instructions to the agent. Five happy-path
+  receipts were reviewed; remaining controlled
+  failure/regression/shutdown results are user-reported without further receipts.
+  The communication plan preserves that evidence distinction. The
+  narrow `start`/`ask` workflow in
+  [AGENT_COMMUNICATION_PLAN.md](AGENT_COMMUNICATION_PLAN.md) is implemented with
+  structured partial-failure receipts, one absolute deadline, bounded CLI calls/
+  evidence, and no resends, cleanup, or interactive-shell verification. Integrated
+  launches explicitly load the read-only skill (including restore); ordinary,
+  opt-out and preparation-fallback launches do not. Upstream CLI/skill/reporting
+  remain unchanged. No Pi tool, extension, version gate, or broader runtime was
+  added. See [HERDR_EXTENSION_RESEARCH.md](HERDR_EXTENSION_RESEARCH.md) for the
+  references consulted, and the durable guide's repeated-cycle/controlled-failure
+  acceptance. The combined offline and reported host results support the tested
+  workflow, not universal dependability.
+- **Eager instructions retained:** the launcher appends the same skill file via
+  repeatable `--append-system-prompt`, integrated-only including restore, while
+  retaining `--skill`. The user accepts the Qwen3.8 success despite Qwen3.6 failure.
+  No further code change is needed. Launcher tests cover inclusion and absence
+  on ordinary/opt-out/fallback launches. Keep model compliance and peer answer
+  quality distinct from script behavior; repeat acceptance when changing models.
+- **Separate follow-up: Herdr Git worktree integration.** Agent-operated helper
+  creation/communication is accepted for the demonstrated models. Worktrees may
+  be considered separately; they remain unimplemented and unvalidated here.
 - **Questionnaire blocked-state adapter — deferred at the user's request.**
   `@juicesharp/rpiv-ask-user-question` emits `rpiv:ask-user:blocked`, whereas the
   official reporter consumes `herdr:blocked`. If implemented, bridge balanced
   active/inactive events locally; do not add a second socket reporter, authority
   source, or sequence owner. Other UI extensions need their own event coverage.
-- **Host validation:** complete the automatic preparation and shutdown checks
-  above before claiming those paths are verified end to end.
+- **Host regression evidence:** retain the checklist above for future changes.
+  The focused acceptance regressions and shutdown passed per the user's report;
+  missing/outdated/current installer transitions are not separately itemized in
+  that report. Do not infer exhaustive coverage or arbitrary-version compatibility.
 - **Socket replacement recovery:** best-effort reporting is implemented;
   continuous recovery across inode replacement is not.
 - **Broader launch-option replay:** only workspace/storage/conversation restore

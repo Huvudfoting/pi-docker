@@ -2,8 +2,13 @@
 
 **Status: existing-agent communication implemented and host acceptance passed
 (user-reported). Sibling creation succeeded on retry (user-reported), but the
-recipe is not dependable enough. Next: focused Docker-Pi skill + script;
-planning only, not implemented.**
+recipe alone was not dependable enough. Focused Docker-Pi skill + script now
+implemented and offline-tested; direct-script host acceptance steps 1–5 passed
+(user-reported, with five happy-path receipts reviewed). Agent-operated
+natural-language prompts passed with cloud `gpt-5.6-luna` and, after eager
+loading, local **Qwen3.8** (user-reported). **Qwen3.6 did not work**; the user
+accepts this model-specific result as success for the focused slice. Shutdown invocation
+clarified as direct execution or Node.js, not Python.**
 
 This extends [PLAN.md](PLAN.md). Durable usage instructions live in
 [the Herdr guide](setup/HERDER_INTEGRATION.md). Herdr Git worktree integration
@@ -13,7 +18,7 @@ remains a subsequent, separate step.
 
 Use Herdr's official CLI plus operating skill, not a Pi subagent extension,
 message bus, replacement CLI, or second lifecycle reporter. A narrow
-Docker-specific workflow adapter is now planned below.
+Docker-specific workflow adapter is now implemented below.
 
 - `setup/pi/build-pi-docker.sh` pins Pi **1.4.0** and Herdr **0.9.5** and passes
   both versions into the Dockerfile. The official Linux CLI supports amd64 and
@@ -148,15 +153,16 @@ The implementation is currently an uncommitted working-tree change set. Preserve
 existing user changes, including the broader core plan. No further live session
 control is implied by this documentation handoff.
 
-## Next implementation: focused Docker-Pi skill + script
+## Focused skill + script: accepted with cloud model and Qwen3.8
 
-**Decision: retain this plan. Do not implement it as part of the current planning
-and extension research task.** One successful retry is not a dependability claim.
-Worktree integration remains deferred until this workflow is dependable.
+The planning/research-only phase is complete. The narrow adapter is implemented;
+one successful historical retry is still not a dependability claim. Worktree
+integration remains a separate subsequent slice; this acceptance does not
+establish worktree support.
 
 ### Structure and ownership
 
-Proposed deployment-owned layout in the existing read-only mount:
+Implemented deployment-owned layout in the existing read-only mount:
 
 ```text
 setup/skills/docker-pi-herdr/
@@ -170,11 +176,14 @@ setup/skills/docker-pi-herdr/
   not a raw socket client, background supervisor, or new message protocol.
 - The official Herdr CLI/server retains agent identity and lifecycle authority.
 - Keep the shared official `herdr` skill and reporting extension unchanged.
-- Plan to load the Docker-specific skill explicitly on integrated launches; check
-  installed Pi discovery/trust/argument behavior before implementation. Do not
-  rewrite shared configuration or copy a second upstream skill on every launch.
+- Integrated launches explicitly load the Docker-specific skill with `--skill`
+  from the read-only deployment mount, including native restore. Installed Pi
+  `skills.md`, `cli.md`, `settings.md`, `packages.md`, `configuration.md` and
+  `security.md` confirm this does not require project trust and survives
+  `--no-skills`. Ordinary/opt-out/auto-fallback launches get no explicit skill.
+  Shared configuration, official skill, and reporting integration are unchanged.
 
-The Docker-specific skill and a short `AGENTS.md` routing rule should direct
+The Docker-specific skill and a short `AGENTS.md` routing rule direct
 Docker-Pi sibling startup and the supported peer exchange through the script,
 not a reconstructed command recipe. General inspection remains with the official
 Herdr skill/CLI. The skills are complementary, not competing operating manuals.
@@ -223,6 +232,131 @@ not task-scoped RPC; the caller must interpret returned state and response.
   paths, plus controlled failure cases and reporting/restore/opt-out regressions.
 - Define success as predictable, bounded, recoverable behavior, not a promise
   that server/process failures can never occur. Record observed test results.
+
+### Implementation validation and handoff
+
+- Added `setup/skills/docker-pi-herdr/SKILL.md` and standard-library-only
+  `scripts/herdr-helper.py`; `setup/bin/pi` passes the explicit skill only when
+  integration actually enabled. No new package, mount, extension, or reporter.
+- The script invokes only official CLI argument arrays. Start validates local
+  context/host-root/name/direction, checks live aliases, selects explicit or
+  geometry-based direction, splits once without focus, captures the pane ID,
+  starts Docker-Pi with exact workspace/storage/required-integration args, then
+  resolves current identity/readiness. Ask resolves an explicit ready target,
+  pins subsequent calls to its returned pane, submits once, inspects state,
+  reads bounded plaintext agent output, and verifies identity again.
+- A single monotonic deadline bounds the workflow, individual CLI processes,
+  and best-effort diagnostics. Receipts retain primary upstream errors/data and
+  CLI exit status, known and conflicting observed identities, mutation/startup/
+  delivery state, and untrusted bounded evidence. Cancellation never triggers
+  diagnostics. Local CLI termination is not remote cleanup/cancellation.
+- Snapshot checks do not reserve aliases or lock a helper against other senders;
+  the skill explicitly requires one outstanding request and no competing sender.
+  Upstream lifecycle waits remain non-task-scoped. No proof of task completion
+  or process-generation identity is manufactured.
+- Reference consultation: published `@ogulcancelik/pi-herdr` **0.4.1** implementation
+  and repository `index.test.ts` (HEAD observed
+  `e34f816ec8234f9b012bf6e19f9b94c19d123d03`): primitive separation, geometry,
+  CLI start/prompt/plaintext-read arrays, contract-test style. Bellwether README
+  (HEAD observed `becba850b59105e1934f62dd61098d31cde70f13`): staged receipts,
+  original errors, uncertainty, absolute deadlines, and bounded untrusted failure
+  evidence that cannot replace the primary failure. Neither runtime was installed
+  or adopted. Checked Herdr **v0.9.5** CLI help and agent/schema source for exact
+  envelopes, `terminal_id`, readiness, startup wait and plaintext read contracts;
+  no version-synchronization gate was added.
+- Offline tests exercise the real script subprocess against a temporary fake CLI
+  and Unix socket, never live panes: exact arrays/order/host paths with quotes,
+  geometry/directions, local guards, duplicates, malformed responses/identities,
+  missing CLI, split/start/prompt/read failures, busy/blocked/self targets,
+  replacement, upstream codes, uncertainty, absolute/client/diagnostic deadlines,
+  bounded output, SIGINT/SIGTERM, no resends or cleanup. Launcher tests assert
+  integrated-only skill selection, including fallback/opt-out and native restore.
+- **Validation:** **52 local tests passed** with
+  `python3 -m unittest discover -s tests -p 'test_*.py'` (including 21 new adapter
+  tests); `bash -n setup/bin/pi`, Python compilation, and `git diff --check`
+  passed. The installed Pi skill loader discovered exactly one new skill with
+  zero diagnostics, using only the deployment-owned skill directory (no model
+  invocation or shared configuration access). No live Herdr pane was inspected
+  or controlled during implementation. Existing user work was retained, not reset
+  or staged by this implementation; the initial staged/planning baseline became
+  commit `163a5a9` externally while implementation was in progress.
+- **Host progress:** the user reports acceptance steps **1–3 completed**, with
+  everything working as intended despite confused replies from simple local
+  models. Reviewed `REMOVE-ME/cmd1.txt` through `cmd5.txt` without controlling
+  live panes. The five receipts directly show:
+  - `cmd1`: successful right start, `trial-r-001`, pane `w1:p2`, ready/idle,
+    startup acknowledged and `focused: false`.
+  - `cmd2`–`cmd4`: three successful serial asks to that helper; delivery
+    acknowledged, stable pane/terminal/session identity, returned idle, and
+    increasing completion sequences (6, 10, 12). Reads contain the successive
+    prompts and model responses, not just an old response.
+  - `cmd5`: successful down start, `trial-d-001`, pane `w1:p4`, ready/idle,
+    startup acknowledged and `focused: false`. Its session storage differs
+    from the right helper's; both starts select the same host project root.
+  - The local model asked for clarification instead of echoing the exact tokens.
+    This validates the observed delivery/turn/read workflow, **not** exact-token
+    instruction following or task-level success. `task_completion: not_asserted`
+    correctly distinguishes those contracts.
+  - These five files do not independently document the full step-3 repeat count,
+    quoted-root/auto-geometry checks, caller focus continuity, elapsed timings or
+    deployed versions; completion of steps 1–3 beyond their contents is the
+    user's report. Keep the evidence distinction rather than inventing results.
+    Temporary receipt files are left untouched; this summary is durable.
+- **Remaining host acceptance passed (user-reported):** the user subsequently
+  reported that all remaining test cases passed, completing steps **4–5** of
+  [the durable checklist](setup/HERDER_INTEGRATION.md#disposable-host-acceptance):
+  controlled failures and reporting/restore/ordinary/opt-out regressions. Shutdown
+  also passed per the report. An initial `python3 .../stop-herdr` reference was
+  clarified as **direct execution or Node.js**; the repository helper is a Node.js
+  script, so no interpreter/path fix is required. No additional failure receipts,
+  timings or version inventory were supplied or independently reviewed. These
+  results are user-reported, not new agent-controlled live tests.
+- **Correction / next:** the user clarified that acceptance so far exercised
+  Python calls, not asking the agent in natural language to open/split/contact
+  helper panes. Direct-script success does **not** complete the agent-facing
+  workflow. Do not move on to worktrees yet.
+- Strengthened the skill's advertised description and `setup/AGENTS.md` routing
+  for ordinary-language requests. The skill now explicitly tells the agent to
+  execute start/ask itself, not hand Python commands back to the user. Added
+  intent mappings for open/helper, split right/down, ask/contact/call, and combined
+  start-then-ask; preserve receipt identity and stop on any partial failure.
+  Blank-shell requests remain with the official skill; genuinely ambiguous intent
+  requires clarification, not a new generic script operation.
+- **Agent-facing result (user-reported):** panes using cloud model
+  `gpt-5.6-luna` successfully completed all supplied natural-language prompts.
+  The second request elicited clarification about the helper name (reported as
+  “reviwer”). Without the transcript, do not assume whether this was a typo,
+  lost prior context, or a genuinely ambiguous target. Clarification is safe
+  when unresolved; an exact helper name from the prior successful receipt should
+  not require reintroduction. No new tool traces or receipts were supplied.
+- A weaker local model searched only tools/extensions and failed to find the
+  skill. This is a **discovery/routing failure**, not evidence that the script
+  or Herdr transport failed. AGENTS now explicitly says this capability lives
+  in a skill/script, uses existing read/shell tools, and must be checked before
+  declaring the capability unavailable. The skill reinforces receipt-based
+  follow-up targeting without silent fuzzy matching. No extension/tool was added.
+- **Discovery diagnosis (user-reported):** strengthened routing text still did
+  not fix the local model, but explicit `/skill:docker-pi-herdr` **works**. The
+  failing layer is automatic discovery, not ability to execute the loaded skill.
+- **Loading change:** `setup/bin/pi` now also appends the existing deployment-owned
+  `SKILL.md` through Pi's documented repeatable `--append-system-prompt` argument
+  on integrated launches, including restore. `--skill` remains for advertisement
+  and forced invocation. The full instructions are therefore present without
+  requiring a model-selected read. This uses one source file, not another runtime,
+  tool, extension, copied configuration or upstream-skill change. It intentionally
+  trades additional system-prompt tokens for removal of the discovery dependency.
+  Ordinary/opt-out/preparation-fallback launches receive no eager skill content.
+- **Eager-loading host result (user-reported):** the latest ordinary-language
+  workflow **worked with Qwen3.8, but not Qwen3.6**. Model labels are recorded as
+  supplied; no additional model configuration, quantization, tool traces or
+  receipts were provided for this retest. The user explicitly accepts this result
+  as success. This closes the focused slice for the demonstrated models without
+  claiming model-independent reliability or every agent-driven failure case.
+- **Disposition:** retain eager loading and the existing narrow script; no further
+  runtime change is needed. Qwen3.6 is a known non-working model for this tested
+  natural-language workflow, not proof of a transport defect. Future model
+  changes should recheck the retained acceptance checklist. Worktree integration
+  is a separate possible follow-up, not implemented or implicitly authorized here.
 
 ### External package review
 
