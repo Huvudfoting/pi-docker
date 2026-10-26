@@ -24,6 +24,21 @@ RUN apt-get update \
         nano \
     && rm -rf /var/lib/apt/lists/*
 
+# Versions are selected in setup/pi/build-pi-docker.sh, not independently here.
+ARG HERDR_VERSION
+RUN : "${HERDR_VERSION:?Build with setup/pi/build-pi-docker.sh or pass HERDR_VERSION}" \
+    && printf 'Building with Herdr v%s integration.\n' "$HERDR_VERSION" \
+    && case "$(dpkg --print-architecture)" in \
+        amd64) arch=x86_64 ;; \
+        arm64) arch=aarch64 ;; \
+        *) echo 'Unsupported Herdr architecture' >&2; exit 1 ;; \
+    esac \
+    && curl --fail --show-error --location --retry 3 \
+        "https://github.com/herdrdev/herdr/releases/download/v${HERDR_VERSION}/herdr-linux-${arch}" \
+        --output /usr/local/bin/herdr \
+    && chmod 755 /usr/local/bin/herdr \
+    && test "$(herdr --version)" = "herdr ${HERDR_VERSION}"
+
 # Fail the build if either runtime or essential Python modules are unavailable.
 RUN gh --version \
     && node --version \
@@ -36,8 +51,10 @@ RUN gh --version \
 
 # Downloaded extensions: npm @latest in the image; homemade code: mounted folders.
 # Deployment source is mounted read-only; keep private state outside setup/pi.
-RUN npm install -g \
-    @earendil-works/pi-coding-agent@latest \
+ARG PI_VERSION
+RUN : "${PI_VERSION:?Build with setup/pi/build-pi-docker.sh or pass PI_VERSION}" \
+    && npm install -g \
+    "@earendil-works/pi-coding-agent@${PI_VERSION}" \
     pi-rewind-hook@latest \
     pi-web-access@latest \
     @juicesharp/rpiv-ask-user-question@latest \

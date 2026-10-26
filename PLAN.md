@@ -4,20 +4,36 @@
 
 The integration is implemented for **local Linux Docker Engine and trusted,
 same-user Herdr sessions**. Eligible interactive launches automatically enable
-Herdr support, prepare the official Pi extension, and print a notice explaining
+Herdr support, prepare the official Pi extension and operating skill, and print a notice explaining
 the session-wide socket access. `--no-herdr` disables integration; `--herdr`
 requires it. Native restore always requires integration and never falls back.
 
 The user previously reported a successful core host launch-and-restore trial.
 The subsequent automatic detection/extension preparation and container-side
 shutdown changes have local test coverage, but still need host validation.
-Compatibility depends on the deployed Herdr and Pi releases retaining the
-reviewed behavior.
+The user has also reported a successful live agent-to-agent `ok` exchange:
+shared skill discovery, container CLI session access, peer execution, bounded
+wait, and response retrieval all passed. This does not validate sibling creation
+or every reporting/restore/shutdown regression. Compatibility depends on the
+deployed Herdr and Pi releases retaining the reviewed behavior.
 
 This file records architecture, implementation constraints, validation, and
 remaining work. Durable user instructions live in
 [the Herdr guide](setup/HERDER_INTEGRATION.md), with general deployment details
 in [SETUP.md](setup/SETUP.md) and [CUSTOMIZATION.md](setup/CUSTOMIZATION.md).
+
+## Communication passed; next step: sibling Docker-Pi helper creation
+
+**Existing-agent communication is implemented and host acceptance passed
+(user-reported).** The next slice is letting Agent A create a sibling pane and
+start a fresh Docker-Pi Agent B in the intended host project without stealing
+focus, then reuse the validated prompt/wait/read exchange.
+
+Follow [AGENT_COMMUNICATION_PLAN.md](AGENT_COMMUNICATION_PLAN.md) for completed
+results, settled version policy, and the next implementation handoff. The key
+remaining adaptation is host launch context: container `/workspace` is not the
+host project path. Use the official CLI/skill, not a Pi subagent extension or
+separate messaging system. Herdr Git worktree integration follows this slice.
 
 ## Settled design
 
@@ -43,8 +59,9 @@ in [SETUP.md](setup/SETUP.md) and [CUSTOMIZATION.md](setup/CUSTOMIZATION.md).
 | Persistent conversations and interactive session switching | Pi |
 | Mode selection, host identity, workspace/storage, Docker execution | `setup/bin/pi` |
 | Detection, argument/context validation, restore records, local diagnostics | `setup/lib/herdr-launch.sh` |
-| Locked extension install/uninstall/ensure operations | `setup/bin/herdr-extension` |
-| Host executable resolution and upstream status parsing | `setup/lib/herdr-extension.sh` |
+| Locked extension and skill install/uninstall/ensure operations | `setup/bin/herdr-extension` |
+| Host executable resolution, upstream status parsing, version-managed skill publication | `setup/lib/herdr-extension.sh` |
+| Pinned Pi/Herdr image build | `setup/pi/build-pi-docker.sh`, `setup/pi/Dockerfile` |
 | Container context/socket mounts | `setup/pi/compose.herdr.yaml` |
 | Explicit session-wide shutdown | `setup/bin/stop-herdr` |
 
@@ -59,7 +76,7 @@ configures mounts/environment, and executes Docker Compose.
 
 | Invocation or condition | Behavior |
 |---|---|
-| Eligible interactive launch with valid local Herdr context | Ensure the official extension, print access notice, launch with Herdr |
+| Eligible interactive launch with valid local Herdr context | Ensure official extension and skill, print access notice, launch with Herdr |
 | No Herdr context | Ordinary launch without integration or a warning |
 | Partial/invalid detected context in auto mode | Warn; launch without integration |
 | Upstream preparation failure in auto mode | Warn that reporting/native restore are unavailable; launch without integration |
@@ -95,9 +112,10 @@ a second time explicitly. Without Herdr context, it remains inactive.
 
 `setup/bin/herdr-extension` supports:
 
-- `install` (also the default action): force official installation/update;
-- `uninstall`: remove only the managed extension;
-- `ensure`: check upstream status and install only when needed.
+- `install` (also the default action): force official extension installation/update
+  and ensure the operating skill;
+- `uninstall`: remove the managed extension, skill, and skill-version marker;
+- `ensure`: check upstream extension status and skill version; install only when needed.
 
 The helper resolves its deployment through symlinks, independently of the
 working directory. It selects executable `HERDR_BIN_PATH` when supplied,
@@ -105,10 +123,29 @@ otherwise `herdr` on `PATH`. A stale explicit binary path is an error, not a
 reason to silently select a different installation. It scopes
 `PI_CODING_AGENT_DIR=<deployment>/data/config` to upstream CLI invocations,
 without changing the caller's environment or host default Pi configuration.
-Herdr itself is never downloaded/upgraded. Manual preparation needs neither
-Docker nor an active pane; changed extensions require a new Pi process/container.
+The helper never downloads/upgrades host Herdr. The image includes the official
+Linux CLI, pinned with Pi in `setup/pi/build-pi-docker.sh` (currently Herdr 0.9.5,
+Pi 1.4.0). Build on the host with `./setup/pi/build-pi-docker.sh`.
+Manual preparation needs neither Docker nor an active pane; changed extensions
+require a new Pi process/container.
 Uninstall preserves credentials, sessions, and launch records; `--no-herdr`
 prevents automatic reinstallation in a Herdr pane.
+
+### Shared skill and version policy
+
+The host binary's `herdr --skill` generates
+`data/config/skills/herdr/SKILL.md`, discovered at
+`/pi/agent/skills/herdr/SKILL.md`. Under the same preparation lock, compare
+`herdr --version` with the adjacent `.herdr-version`; refresh only on version
+change or missing/empty skill. Stage files before replacement; generation failure
+preserves the previous skill and marker. `/reload` refreshes active Pi skill
+discovery. The upstream skill remains unchanged; Docker-specific guidance lives
+in `setup/AGENTS.md`.
+
+An integrated launch authorizes Herdr features, including peer communication.
+Potential host/server/container version mismatches are accepted; rely on upstream
+compatibility. Do not add version forwarding, mismatch gates, or automatic server
+updates/restarts. The skill marker is not a running-server version check.
 
 ### Status and verification
 
@@ -260,12 +297,18 @@ A missing launch record is normal before the first enabled launch.
 - The user reported the earlier core host launch-and-restore trial succeeded:
   wrapper identification, official state/session reporting, and restoration to
   the same workspace/storage/conversation worked in that deployment.
-- The local suite has 25 fake-Docker/fake-Herdr and temporary-socket tests. It
+- The local suite has 29 fake-Docker/fake-Herdr and temporary-socket tests. It
   covers automatic current/missing/outdated preparation, unchanged current
   extensions, executable/configuration targeting, malformed status, opt-out,
   ineligible invocations, strict restore failures, auto fallback, read-only
   diagnostics, concurrent installation once, and shutdown request/response and
-  ambiguous-outcome handling without retries.
+  ambiguous-outcome handling without retries. Added coverage includes shared
+  skill refresh/no-op/concurrency/failure-safe publication/removal, and build
+  wrapper pins, path quoting, argument forwarding, and exit-status propagation.
+- The user reported all live communication acceptance criteria passed: skill
+  discovery, CLI access to the connected session, peer execution of
+  `Answer only ok`, bounded wait, and retrieval of `ok`. Helper creation and
+  exhaustive failure-path testing were not part of that check.
 - Bash syntax and scoped whitespace checks passed during implementation.
 
 Run the local suite without contacting a real Herdr server:
@@ -299,10 +342,13 @@ Use a disposable named session so restart/shutdown cannot affect real work:
 
 ## Remaining work and non-goals
 
-- **Pane-to-pane communication in Herdr:** explore communication between agents
-  in separate panes, including appropriate control and permission boundaries.
-- **Herdr Git worktree integration:** explore using Herdr's worktree support for
-  isolated, concurrent agent work.
+- **Next: sibling Docker-Pi helper creation.** Existing-agent CLI/skill
+  communication passed host acceptance. Follow the handoff in
+  [AGENT_COMMUNICATION_PLAN.md](AGENT_COMMUNICATION_PLAN.md): create a sibling
+  without focus theft, launch Docker-Pi with validated host project/storage
+  context, and repeat the `ok` exchange. No review workflow is required.
+- **Subsequent: Herdr Git worktree integration.** Explore Herdr's worktree
+  support for isolated, concurrent editing agents after helper creation works.
 - **Questionnaire blocked-state adapter — deferred at the user's request.**
   `@juicesharp/rpiv-ask-user-question` emits `rpiv:ask-user:blocked`, whereas the
   official reporter consumes `herdr:blocked`. If implemented, bridge balanced

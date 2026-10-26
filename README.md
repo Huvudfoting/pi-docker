@@ -4,8 +4,10 @@ Run Pi in disposable Docker containers with persistent projects, configuration,
 and sessions. Use a shared Ollama service for local inference or configured
 cloud providers.
 
-Eligible interactive launches inside a Herdr pane automatically enables 
-the official Pi integration. 
+Eligible interactive launches inside a Herdr pane automatically enable the
+official Pi integration and Herdr operating skill. Existing agents can communicate
+through the official CLI; the prompt/wait/read exchange has passed host acceptance.
+Sibling helper creation is the next step, not yet validated.
 Use `--no-herdr` to disable integration or `--herdr` to require it.
 
 ## Get started

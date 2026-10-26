@@ -69,7 +69,7 @@ Build the Pi image before running the launcher:
 
 ```bash
 chmod +x setup/bin/pi
-docker build -t pi-agent:latest ./setup/pi
+./setup/pi/build-pi-docker.sh
 ```
 
 The launcher checks for this image and prints the build command if it is missing.
@@ -98,14 +98,18 @@ current workspace. `pi --help` shows launcher usage without requiring Docker;
 
 Install Herdr on the host, then launch `pi /absolute/path/to/project` inside a
 Herdr pane. Eligible interactive launches automatically install/update its
-official Pi extension in this deployment's configuration and enable support.
+official Pi extension and bundled operating skill in this deployment's shared
+configuration and enable support.
 To install/update explicitly instead:
 
 ```bash
 ./setup/bin/herdr-extension install
 ```
 
-No image rebuild is needed. Enabled launches print a socket-access notice.
+Extension/skill preparation needs no image rebuild. The container Herdr CLI is
+installed from the version pinned in `setup/pi/build-pi-docker.sh`; rebuild and
+start new containers when updating the pin. Potential host/server/container
+version mismatches are accepted without a runtime synchronization check. Enabled launches print a socket-access notice.
 Use `--no-herdr` to prevent installation and socket exposure, or `--herdr` to
 require integration rather than warn and fall back on preparation failure. See
 [Herdr integration](HERDER_INTEGRATION.md) for requirements, updates/removal,

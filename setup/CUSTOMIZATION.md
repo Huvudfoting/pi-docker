@@ -33,6 +33,17 @@ The official `herdr-agent-state.ts` is managed by host Herdr in
 It is not an image-managed npm package and must not be vendored or modified
 here; it remains inactive without Herdr context. Eligible interactive launches
 inside Herdr automatically check upstream status and install/update when needed.
+The same locked preparation installs the bundled operating skill at
+`data/config/skills/herdr/SKILL.md` (container `/pi/agent/skills/herdr/SKILL.md`).
+It refreshes only when missing/empty or the selected host Herdr version changes;
+there are no shared-settings edits or per-launch skill rewrites. Use `/reload`
+to discover a newly installed skill in an existing Pi session.
+
+The official Herdr CLI is image-managed for amd64/arm64. Its version and Pi's
+version are pinned in the host `setup/pi/build-pi-docker.sh` script. Rebuild the image and start new containers to update it; the host
+CLI and its bundled skill are updated separately on the host. This slice assumes
+upstream compatibility when host and image versions differ.
+
 Use `--no-herdr` to prevent that preparation and socket exposure. See
 [Herdr installation and updates](HERDER_INTEGRATION.md#scope-and-installation)
 for the host installer, update, and removal workflow.
@@ -85,11 +96,18 @@ than adding a background supervisor or a second lifecycle reporter.
 
 ## Updating image-managed packages
 
-The Python/uv image tags and npm `@latest` track current releases rather than
-pinning versions. Pull fresh images and bypass build caches to update them:
+Pi and Herdr are pinned in `setup/pi/build-pi-docker.sh` (currently Pi 1.4.0 and Herdr
+0.9.5). Update those pins deliberately. Host/server/container mismatches are
+accepted; there is no runtime alignment gate. The script
+passes them as build arguments; direct Docker builds must supply both
+`PI_VERSION` and `HERDR_VERSION`. Pinning the image does not update or check host
+Herdr or an already-running server.
+
+Python/uv image tags and extension npm `@latest` still track current releases.
+To refresh those dependencies, bypass build caches:
 
 ```bash
-docker build --no-cache -t pi-agent:latest ./setup/pi
+./setup/pi/build-pi-docker.sh --no-cache
 docker run --rm pi-agent:latest --version
 ```
 

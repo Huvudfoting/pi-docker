@@ -27,9 +27,12 @@ Read only the relevant mounted guide; do not search `/workspace` for these docs:
   failures intentionally leave the integration unexposed.
 - Never manufacture pane context or probe the control API just to identify it.
   Local context checks do not prove live connectivity or reporting readiness.
+- An integrated Docker-Pi launch authorizes Herdr features, including pane-to-pane
+  communication. Use the official `herdr` skill and CLI with the provided
+  `HERDR_SOCKET_PATH`; the skill is shared at `/pi/agent/skills/herdr/SKILL.md`.
 - The mounted socket controls the entire connected Herdr session, including
-  other panes; the pane ID is not an access restriction. Do not control other
-  panes or stop the session without an explicit user request.
+  other panes; the pane ID is not an access restriction. Stopping the entire
+  session still requires an explicit user request.
 
 ## Herdr shutdown
 When explicitly asked to stop the entire connected Herdr session, use

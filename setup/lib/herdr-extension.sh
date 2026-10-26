@@ -16,6 +16,31 @@ herdr_resolve_binary() {
   fi
 }
 
+# Called under the same preparation lock as the official reporting integration.
+# Use the host binary's bundled skill; never fetch a separate moving copy.
+herdr_ensure_skill() (
+  set -euo pipefail
+  local directory="$config/skills/herdr" version installed="" temporary="" marker=""
+  version="$(PI_CODING_AGENT_DIR="$config" "$herdr_bin" --version)"
+  [[ -n "$version" ]] || { printf 'Herdr returned an empty version.\n' >&2; exit 1; }
+  if [[ -r "$directory/.herdr-version" ]]; then
+    installed="$(<"$directory/.herdr-version")"
+  fi
+  if [[ "$installed" == "$version" && -s "$directory/SKILL.md" && -r "$directory/SKILL.md" ]]; then
+    exit 0
+  fi
+  mkdir -p -- "$directory"
+  trap 'rm -f -- "$temporary" "$marker"' EXIT
+  temporary="$(mktemp "$directory/.skill.XXXXXX")"
+  marker="$(mktemp "$directory/.version.XXXXXX")"
+  PI_CODING_AGENT_DIR="$config" "$herdr_bin" --skill > "$temporary"
+  [[ -s "$temporary" ]] || { printf 'Herdr returned an empty skill.\n' >&2; exit 1; }
+  printf '%s\n' "$version" > "$marker"
+  mv -f -- "$temporary" "$directory/SKILL.md"
+  mv -f -- "$marker" "$directory/.herdr-version"
+  printf 'Installed official Herdr skill (%s) in %s.\n' "$version" "$directory" >&2
+)
+
 herdr_pi_integration_state() {
   local output line state="" count=0 suffix=" ($extension)"
   output="$(PI_CODING_AGENT_DIR="$config" "$herdr_bin" integration status)" || {

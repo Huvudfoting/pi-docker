@@ -93,7 +93,7 @@ require_docker() {
   if ! docker image inspect pi-agent:latest >/dev/null 2>&1; then
     printf '%s\n' 'pi-docker: Cannot inspect pi-agent:latest. Check that the Docker daemon is running and accessible.
 If the image is missing, build it on the host from the docker-pi repository root:
-  docker build -t pi-agent:latest ./setup/pi' >&2
+  ./setup/pi/build-pi-docker.sh' >&2
     exit 1
   fi
 }

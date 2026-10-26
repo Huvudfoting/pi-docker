@@ -15,7 +15,7 @@ After [initial setup](SETUP.md), build the image on the host from this
 deployment's repository root:
 
 ```bash
-docker build -t pi-agent:latest ./setup/pi
+./setup/pi/build-pi-docker.sh
 ```
 
 Run these commands on the host after installing the launcher. If the image is
