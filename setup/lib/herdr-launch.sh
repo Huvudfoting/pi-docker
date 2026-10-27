@@ -192,7 +192,7 @@ herdr_show_status() {
   if [[ -n "$pi_path" && "$(realpath -- "$pi_path")" == "$script" ]]; then
     printf 'Native restore PATH: pi resolves to this launcher\n'
   else
-    printf 'Native restore PATH: pi does not resolve to this launcher; see setup/SETUP.md (host launcher symlink)\n'
+    printf 'Native restore PATH: pi does not resolve to this launcher; see setup/docs/SETUP.md (host launcher symlink)\n'
     issues=1
   fi
   if [[ -t 0 && -t 1 ]]; then

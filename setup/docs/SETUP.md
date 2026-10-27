@@ -1,21 +1,22 @@
-# Pi Docker + Ollama setup
+# Pi Docker setup
 
-Pi and Ollama are independent Compose projects sharing the explicitly named
-`pi-ollama` network. Ollama creates it; Pi joins it as an external network.
-Restarting Pi does not restart the GPU inference server.
+Pi uses host networking to reach externally managed model APIs at host-accessible
+URLs. Local model serving, installation, storage, and lifecycle management are
+outside this project's scope. Starting or restarting Pi does not manage a model
+server.
 
 **All commands below run on the host from the repository root unless stated otherwise.**
 The repository root is the directory containing `setup/` and `data/`.
 
-For everyday commands see [README.md](README.md); for extension policy, resource
+For everyday commands see [README.md](../README.md); for extension policy, resource
 paths, and reload/rebuild rules see [CUSTOMIZATION.md](CUSTOMIZATION.md).
 For OpenAI/provider login and GitHub credentials, see
 [AUTHENTICATION.md](AUTHENTICATION.md).
 
 ## Requirements
 
-- Docker Engine and the Compose plugin.
-- NVIDIA Container Toolkit for the configured Ollama GPU service.
+- Docker Engine on Linux and the Compose plugin. Docker Desktop requires
+  host networking support to be enabled (version 4.34 or later).
 - Bash, GNU `realpath`, and `sha256sum` for the launchers.
 - Optional Herdr integration: host Herdr and `flock` (util-linux).
 - A host `~/.gitconfig` file (mounted read-only for Git identity and settings).
@@ -31,10 +32,11 @@ For OpenAI/provider login and GitHub credentials, see
 | `data/herdr-launches/` | Not separately mounted | Private workspace/storage records for optional Herdr restore |
 | Selected project | `/workspace` | Writable project files |
 | `~/.gitconfig` | `/home/node/.gitconfig` | Read-only Git settings |
-| Model store selected in `data/ollama.env` | `/models` in Ollama | Persistent model files |
 
 `data/` is ignored by Git. Keep credentials, sessions, and real environment files
-there, never under `setup/`. The Pi image build context is only `setup/pi/`.
+there, never under `setup/`. The Pi image build context is `setup/`, with a
+Dockerfile-only allowlist in `setup/.dockerignore`; deployment guides and resources
+are mounted at runtime, not copied into the image.
 The setup mount exposes current host source, which may be newer than the image.
 Missing deployment mount sources fail rather than being created silently.
 
@@ -42,41 +44,32 @@ The launcher appends `/opt/pi-docker/AGENTS.md` to the system prompt, making
 these guides discoverable even when `/workspace` is a different repository.
 Direct `docker run` invocations do not provide the mount or those instructions.
 
-## 1. Start Ollama
+## Local model endpoints
 
-```bash
-mkdir -p data
-cp setup/ollama/.env.example data/ollama.env
-```
+If you use local models, an API compatible with your configured Pi provider must
+already be available at a URL reachable from the host. Configure the provider's
+base URL, model IDs, and any required authentication as described in
+[AUTHENTICATION.md](AUTHENTICATION.md).
 
-Edit `data/ollama.env` and set `OLLAMA_MODELS` to an absolute host model-store
-path. Create that directory before starting the service, then run:
+Pi uses host networking, so a host-local endpoint can use `127.0.0.1`; remote
+endpoints use their host-accessible URL. Include any API path required by your
+provider. The launcher does not discover model servers or configure provider
+URLs automatically. No model service, GPU runtime, or model storage is bundled.
 
-```bash
-docker compose --env-file data/ollama.env -f setup/ollama/compose.yaml up -d
-```
-
-Other containers on the shared network reach `http://ollama:11434`. Only host
-localhost port 11434 is published.
-
-If you change `OLLAMA_NETWORK` in `data/ollama.env`, also export that same value
-in the host shell before using `pi`. The launcher does not source the Ollama
-environment file.
-
-## 2. Build Pi
+## 1. Build Pi
 
 Build the Pi image before running the launcher:
 
 ```bash
 chmod +x setup/bin/pi
-./setup/pi/build-pi-docker.sh
+./setup/bin/build
 ```
 
 The launcher checks for this image and prints the build command if it is missing.
 After building, follow [AUTHENTICATION.md](AUTHENTICATION.md) for OpenAI/provider
 login, model configuration, and optional GitHub CLI credentials.
 
-## 3. Install the host launcher symlink
+## 2. Install the host launcher symlink
 
 ```bash
 mkdir -p ~/.local/bin
@@ -107,12 +100,12 @@ To install/update explicitly instead:
 ```
 
 Extension/skill preparation needs no image rebuild. The container Herdr CLI is
-installed from the version pinned in `setup/pi/build-pi-docker.sh`; rebuild and
+installed from the version pinned in `setup/bin/build`; rebuild and
 start new containers when updating the pin. Potential host/server/container
 version mismatches are accepted without a runtime synchronization check. Enabled launches print a socket-access notice.
 Use `--no-herdr` to prevent installation and socket exposure, or `--herdr` to
 require integration rather than warn and fall back on preparation failure. See
-[Herdr integration](HERDER_INTEGRATION.md) for requirements, updates/removal,
+[Herdr integration](HERDR_INTEGRATION.md) for requirements, updates/removal,
 restore, diagnostics, and socket security.
 
 ## Security and concurrency
@@ -131,8 +124,10 @@ restore, diagnostics, and socket security.
 - Containers and session directories do not isolate simultaneous edits to the
   same checkout. Use separate Git worktrees for concurrent writing agents.
 - This is process/filesystem isolation, not a hardened sandbox. Agents can modify
-  mounted projects and reach services on the shared Docker network.
-- Optional [Herdr mode](HERDER_INTEGRATION.md) exposes Herdr's full local control
+  mounted projects. Host networking also lets them reach host-local services
+  (including loopback listeners) and bind host ports; there is no network
+  isolation from the host.
+- Optional [Herdr mode](HERDR_INTEGRATION.md) exposes Herdr's full local control
   socket, including control of other panes. Use it only with trusted containers;
   eligible interactive launches inside Herdr enable it automatically with a
   notice. Use `--no-herdr` to prevent installation and socket exposure.
@@ -143,12 +138,10 @@ restore, diagnostics, and socket security.
 
 ## Diagnostics
 
-```bash
-docker network inspect pi-ollama
-docker compose --env-file data/ollama.env -f setup/ollama/compose.yaml config
-docker compose --env-file data/ollama.env -f setup/ollama/compose.yaml ps
-docker compose --env-file data/ollama.env -f setup/ollama/compose.yaml logs -f ollama
-```
+For local model connectivity, check your configured provider URL from the host
+and from Pi's shell tool using the API's documented health or model-list route
+and required authentication. Model server diagnostics and management are outside
+this project's scope.
 
 To render the Pi Compose configuration, provide the variables normally supplied
 by the launcher:
@@ -159,19 +152,15 @@ GH_CONFIG="$PWD/data/gh-config" \
 PI_SESSIONS="$PWD/data/sessions/login" \
 PI_WORKSPACE="$PWD/setup" \
 PI_UID="$(id -u)" PI_GID="$(id -g)" \
-  docker compose -f setup/pi/compose.yaml config
+  docker compose -f setup/compose.yaml config
 ```
 
 Diagnostic output can include local paths or configured environment values;
-review before sharing. Use the network name you configured if not `pi-ollama`.
+review before sharing.
 
 ## Removal
 
-Stop Pi containers first, then stop Ollama:
-
-```bash
-docker compose --env-file data/ollama.env -f setup/ollama/compose.yaml down
-```
-
-`down` does not delete the external model store or `data/`. Remove private data
-only deliberately, after backing up any configuration and sessions you need.
+Exit Pi to remove its disposable container. Remove the host launcher symlink if
+it is no longer needed. Configuration and sessions remain in `data/`; remove
+private data only deliberately, after backing up anything you need. Externally
+managed model servers and their storage are unaffected.

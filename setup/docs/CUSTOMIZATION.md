@@ -2,7 +2,7 @@
 
 **Commands run on the host from the deployment repository root unless marked as
 container commands.** See [SETUP.md](SETUP.md) for installation and
-[README.md](README.md) for everyday usage. OpenAI/provider login and GitHub
+[README.md](../README.md) for everyday usage. OpenAI/provider login and GitHub
 credentials are documented in [AUTHENTICATION.md](AUTHENTICATION.md).
 
 ## Container runtimes
@@ -18,7 +18,7 @@ automatic Python downloads; use the image-provided interpreter.
 ## Extension architecture decision
 
 - **Downloaded/third-party extensions (except Herdr below):** install `package@latest` with npm in
-  `setup/pi/Dockerfile`, baked into the image. Explicitly load them with
+  `setup/Dockerfile`, baked into the image. Explicitly load them with
   `--extension` in `setup/bin/pi`; global npm installation alone does not load
   an extension. Do not vendor upstream code into custom folders or deploy it
   with runtime `pi install`.
@@ -32,7 +32,7 @@ Host Herdr manages the official `herdr-agent-state.ts` reporter and operating
 skill under `data/config/`; do not vendor or modify them. Integrated launches
 prepare these resources automatically. The container CLI is image-managed;
 the Docker-Pi helper skill lives in `setup/skills/docker-pi-herdr/` and is loaded
-by the launcher. See [Herdr maintenance](HERDER_INTEGRATION.md#maintenance-and-diagnostics)
+by the launcher. See [Herdr maintenance](HERDR_INTEGRATION.md#maintenance-and-diagnostics)
 for updates, removal and process refresh requirements. Use `--no-herdr` to skip
 preparation and socket exposure.
 
@@ -84,7 +84,7 @@ than adding a background supervisor or a second lifecycle reporter.
 
 ## Updating image-managed packages
 
-Pi and Herdr are pinned in `setup/pi/build-pi-docker.sh` (currently Pi 1.4.0 and Herdr
+Pi and Herdr are pinned in `setup/bin/build` (currently Pi 1.4.0 and Herdr
 0.9.5). Update those pins deliberately. Host/server/container mismatches are
 accepted; there is no runtime alignment gate. The script
 passes them as build arguments; direct Docker builds must supply both
@@ -95,7 +95,7 @@ Python/uv image tags and extension npm `@latest` still track current releases.
 To refresh those dependencies, bypass build caches:
 
 ```bash
-./setup/pi/build-pi-docker.sh --no-cache
+./setup/bin/build --no-cache
 docker run --rm pi-agent:latest --version
 ```
 

@@ -17,10 +17,10 @@ class BuildPiDockerTest(unittest.TestCase):
     def test_pins_context_argument_boundaries_and_exit_status(self):
         with tempfile.TemporaryDirectory(prefix="pi build ") as temporary:
             root = Path(temporary)
-            context = root / "setup/pi"
-            context.mkdir(parents=True)
-            script = context / "build-pi-docker.sh"
-            shutil.copy2(SOURCE / "setup/pi" / script.name, script)
+            context = root / "setup"
+            (context / "bin").mkdir(parents=True)
+            script = context / "bin/build"
+            shutil.copy2(SOURCE / "setup/bin/build", script)
             self.assertTrue(os.access(script, os.X_OK))
             binaries = root / "bin"
             binaries.mkdir()
@@ -48,7 +48,7 @@ class BuildPiDockerTest(unittest.TestCase):
                     "build", "--no-cache", "--label", "test=value with spaces",
                     "--build-arg", "PI_VERSION=1.4.0",
                     "--build-arg", "HERDR_VERSION=0.9.5",
-                    "--tag", "pi-agent:latest", str(root / "setup/pi"),
+                    "--tag", "pi-agent:latest", str(context),
                 ])
 
 

@@ -2,7 +2,7 @@
 
 **Commands run on the host from the deployment repository root unless marked as
 container commands.** Build the image and start the required services first; see
-[SETUP.md](SETUP.md). For everyday launcher usage, see [README.md](README.md).
+[SETUP.md](SETUP.md). For everyday launcher usage, see [README.md](../README.md).
 
 ## OpenAI and other Pi providers
 

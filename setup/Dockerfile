@@ -24,9 +24,9 @@ RUN apt-get update \
         nano \
     && rm -rf /var/lib/apt/lists/*
 
-# Versions are selected in setup/pi/build-pi-docker.sh, not independently here.
+# Versions are selected in setup/bin/build, not independently here.
 ARG HERDR_VERSION
-RUN : "${HERDR_VERSION:?Build with setup/pi/build-pi-docker.sh or pass HERDR_VERSION}" \
+RUN : "${HERDR_VERSION:?Build with setup/bin/build or pass HERDR_VERSION}" \
     && printf 'Building with Herdr v%s integration.\n' "$HERDR_VERSION" \
     && case "$(dpkg --print-architecture)" in \
         amd64) arch=x86_64 ;; \
@@ -50,9 +50,9 @@ RUN gh --version \
     && uvx --version
 
 # Downloaded extensions: npm @latest in the image; homemade code: mounted folders.
-# Deployment source is mounted read-only; keep private state outside setup/pi.
+# Deployment source is mounted read-only; keep private state outside setup/.
 ARG PI_VERSION
-RUN : "${PI_VERSION:?Build with setup/pi/build-pi-docker.sh or pass PI_VERSION}" \
+RUN : "${PI_VERSION:?Build with setup/bin/build or pass PI_VERSION}" \
     && npm install -g \
     "@earendil-works/pi-coding-agent@${PI_VERSION}" \
     pi-rewind-hook@latest \

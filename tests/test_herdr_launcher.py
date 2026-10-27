@@ -144,6 +144,13 @@ class HerdrLauncherTest(unittest.TestCase):
         self.env['HERDR_LOG'] = str(self.root / 'herdr.json')
         return herdr
 
+    def test_standalone_launch_uses_only_pi_compose(self):
+        result, invocation = self.launch(self.project, "--name", "standalone", "--no-herdr")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(invocation["args"][:3], [
+            "compose", "-f", str(self.setup / "compose.yaml"),
+        ])
+
     def test_help_and_status_are_read_only_without_docker_calls(self):
         private = self.root / "data/config/auth.json"
         private.write_text('TEST-ONLY-secret-do-not-print')
@@ -237,7 +244,7 @@ class HerdrLauncherTest(unittest.TestCase):
         self.assertIn('Herdr integration enabled', result.stderr)
         self.assertIn('including other panes', result.stderr)
         self.assertIn('--no-herdr', result.stderr)
-        self.assertIn(str(self.setup / 'pi/compose.herdr.yaml'), invocation['args'])
+        self.assertIn(str(self.setup / 'compose.herdr.yaml'), invocation['args'])
         self.assertEqual(self.herdr_calls(), [['integration', 'status'], ['--version']])
         self.assertEqual(extension.stat().st_mtime_ns, before)
 
@@ -280,7 +287,7 @@ class HerdrLauncherTest(unittest.TestCase):
             with self.subTest(args=args, patch=patch):
                 result, invocation = self.launch(self.project, '--name', 'backend', *args, env={**self.env, **patch})
                 self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertNotIn(str(self.setup / 'pi/compose.herdr.yaml'), invocation['args'])
+                self.assertNotIn(str(self.setup / 'compose.herdr.yaml'), invocation['args'])
                 self.assertIsNone(invocation['env']['HERDR_AGENT'])
                 self.assertEqual(self.herdr_calls(), [])
         result = self.run_command(self.setup / 'bin/pi', str(self.project), '--name', 'backend')
@@ -305,7 +312,7 @@ class HerdrLauncherTest(unittest.TestCase):
                 self.assertIn('reporting and native restore are unavailable', result.stderr)
                 self.assertNotIn('Herdr integration enabled', result.stderr)
                 self.assertEqual(invocation['env']['PI_SESSION_TARGET'], '/pi/sessions')
-                self.assertNotIn(str(self.setup / 'pi/compose.herdr.yaml'), invocation['args'])
+                self.assertNotIn(str(self.setup / 'compose.herdr.yaml'), invocation['args'])
                 result, invocation = self.launch(self.project, '--name', 'backend', '--herdr', env=env)
                 self.assertEqual(result.returncode, 2, result.stderr)
                 self.assertIsNone(invocation)
@@ -416,7 +423,7 @@ class HerdrLauncherTest(unittest.TestCase):
         env = {**self.env, "PI_SESSION_TARGET": "/unexpected"}
         result, invocation = self.launch(self.project, "--name", "backend", "--", "--version", env=env)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertNotIn(str(self.setup / "pi/compose.herdr.yaml"), invocation["args"])
+        self.assertNotIn(str(self.setup / "compose.herdr.yaml"), invocation["args"])
         self.assertEqual(invocation["env"]["PI_SESSION_TARGET"], "/pi/sessions")
         self.assertIsNone(invocation["env"]["HERDR_AGENT"])
         self.assertEqual(invocation["args"][-1], "--version")
@@ -435,8 +442,8 @@ class HerdrLauncherTest(unittest.TestCase):
         # Contract check: the fake Docker CLI does not evaluate Compose YAML.
         # The override consumes the launcher's resolved PI_WORKSPACE; there is
         # no passthrough from a possibly stale PI_DOCKER_HOST_WORKSPACE value.
-        override = (self.setup / 'pi/compose.herdr.yaml').read_text()
-        base = (self.setup / 'pi/compose.yaml').read_text()
+        override = (self.setup / 'compose.herdr.yaml').read_text()
+        base = (self.setup / 'compose.yaml').read_text()
         self.assertIn('      PI_DOCKER_HOST_WORKSPACE: "${PI_WORKSPACE:?}"', override)
         self.assertNotIn('PI_DOCKER_HOST_WORKSPACE', base)
         alias = self.root / 'project alias'
@@ -456,7 +463,7 @@ class HerdrLauncherTest(unittest.TestCase):
                 })
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(invocation['env']['PI_WORKSPACE'], str(self.project))
-                self.assertEqual(str(self.setup / 'pi/compose.herdr.yaml') in invocation['args'], integrated)
+                self.assertEqual(str(self.setup / 'compose.herdr.yaml') in invocation['args'], integrated)
                 self.assertEqual('--skill' in invocation['args'], integrated)
                 eager_skill = '/opt/pi-docker/skills/docker-pi-herdr/SKILL.md'
                 self.assertEqual(eager_skill in invocation['args'], integrated)
@@ -476,7 +483,7 @@ class HerdrLauncherTest(unittest.TestCase):
         self.assertEqual(sibling['env']['PI_WORKSPACE'], original['env']['PI_WORKSPACE'])
         self.assertNotEqual(sibling['env']['PI_SESSIONS'], original['env']['PI_SESSIONS'])
         self.assertNotEqual(sibling['env']['PI_SESSION_TARGET'], original['env']['PI_SESSION_TARGET'])
-        self.assertIn(str(self.setup / 'pi/compose.herdr.yaml'), sibling['args'])
+        self.assertIn(str(self.setup / 'compose.herdr.yaml'), sibling['args'])
         self.assertNotIn('--name', sibling['args'])  # Consumed by host launcher, not Pi.
         self.assertNotIn('--herdr', sibling['args'])
 
@@ -490,7 +497,7 @@ class HerdrLauncherTest(unittest.TestCase):
 
     def test_native_restore_recovers_selection_and_uses_fresh_context(self):
         original = self.initial_launch()
-        self.assertIn(str(self.setup / "pi/compose.herdr.yaml"), original["args"])
+        self.assertIn(str(self.setup / "compose.herdr.yaml"), original["args"])
         self.assertEqual(original["env"]["HERDR_AGENT"], "pi")
         target = original["env"]["PI_SESSION_TARGET"]
         self.assertRegex(target, r"^/pi/herdr-sessions/[a-f0-9]{64}$")
@@ -510,7 +517,7 @@ class HerdrLauncherTest(unittest.TestCase):
         self.assertEqual(restored["env"]["HERDR_SOCKET_HOST_PATH"], fresh["HERDR_SOCKET_PATH"])
         self.assertEqual(restored["env"]["HERDR_AGENT"], "pi")
         # Integrated Compose maps this recovered root into PI_DOCKER_HOST_WORKSPACE.
-        self.assertIn(str(self.setup / 'pi/compose.herdr.yaml'), restored['args'])
+        self.assertIn(str(self.setup / 'compose.herdr.yaml'), restored['args'])
         self.assertEqual(restored['env']['PI_WORKSPACE'], str(self.project))
         self.assertEqual(restored["args"][-2:], ["--session", reference])
         index = restored['args'].index('--skill')

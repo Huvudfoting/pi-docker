@@ -11,12 +11,12 @@ You are running inside a Pi Docker container, not on the host.
 - `/workspace` is the mounted project; its absolute host path may differ.
 
 Read only the relevant mounted guide; do not search `/workspace` for these docs:
-- Installation and security: `/opt/pi-docker/SETUP.md`.
-- OpenAI/provider login and GitHub credentials: `/opt/pi-docker/AUTHENTICATION.md`.
-- Runtimes, resources, extension policy, maintenance: `/opt/pi-docker/CUSTOMIZATION.md`.
+- Installation and security: `/opt/pi-docker/docs/SETUP.md`.
+- OpenAI/provider login and GitHub credentials: `/opt/pi-docker/docs/AUTHENTICATION.md`.
+- Runtimes, resources, extension policy, maintenance: `/opt/pi-docker/docs/CUSTOMIZATION.md`.
 - Launcher and session usage: `/opt/pi-docker/README.md`.
 - Herdr integration, diagnostics, restore, and shutdown:
-  `/opt/pi-docker/HERDER_INTEGRATION.md`.
+  `/opt/pi-docker/docs/HERDR_INTEGRATION.md`.
 
 ## Herdr
 - Connected context requires `HERDR_ENV=1`, nonempty `HERDR_PANE_ID`, and an

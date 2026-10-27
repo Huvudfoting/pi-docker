@@ -6,7 +6,7 @@ helpers and peer requests. It uses the official Herdr CLI, skill and Pi reporter
 ## Scope and installation
 
 Requires **local Linux Docker Engine**, a trusted same-user Herdr session, and
-this deployment's [host launcher on PATH](SETUP.md#3-install-the-host-launcher-symlink).
+this deployment's [host launcher on PATH](SETUP.md#2-install-the-host-launcher-symlink).
 New pane shells must resolve `pi` to that launcher, not a host-native Pi install.
 The mounted socket controls the **entire connected session**; the pane ID is not
 an access restriction. Docker Desktop, remote Docker and Windows are unsupported.
@@ -43,7 +43,7 @@ general inspection remain with the official Herdr skill.
 Integrated launches advertise the skill and append its instructions from the
 read-only deployment mount. `/skill:docker-pi-herdr <request>` also invokes it
 explicitly. A fresh launch is needed to pick up changed appended instructions.
-The [skill](skills/docker-pi-herdr/SKILL.md) documents commands and receipt handling.
+The [skill](../skills/docker-pi-herdr/SKILL.md) documents commands and receipt handling.
 
 Helpers use `PI_DOCKER_HOST_WORKSPACE`, the selected host project root, even when
 the caller is in a subdirectory. Never substitute container `/workspace` or guess
@@ -85,7 +85,7 @@ prevent preparation on the next launch. Start a new Pi process after reporter
 changes; `/reload` refreshes discovered skills. The Docker-Pi helper skill remains
 deployment-owned, separate from these upstream resources.
 
-The image pins Pi and the container Herdr CLI in `setup/pi/build-pi-docker.sh`.
+The image pins Pi and the container Herdr CLI in `setup/bin/build`.
 Rebuild and start new containers to update them. Host Herdr is managed separately;
 the launcher neither synchronizes versions nor upgrades or restarts the server.
 If the bound socket is replaced, start a fresh integrated container.

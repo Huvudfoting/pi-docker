@@ -24,21 +24,16 @@ services:
         read_only: true
         bind:
           create_host_path: false
-      # Only safe deployment source lives here; private state is in ../../data/.
+      # Only safe deployment source lives here; private state is in ../data/.
       - type: bind
-        source: ../
+        source: .
         target: /opt/pi-docker
         read_only: true
         bind:
           create_host_path: false
     working_dir: /workspace
-    networks:
-      - ollama
+    network_mode: host
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
-networks:
-  ollama:
-    external: true
-    name: ${OLLAMA_NETWORK:-pi-ollama}

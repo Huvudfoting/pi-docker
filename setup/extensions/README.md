@@ -9,4 +9,4 @@ including when it contains no extensions. It discovers top-level `.ts`/`.js`
 files and immediate subdirectories with `index.ts`/`index.js`.
 
 Downloaded extensions belong in the image as npm `@latest` dependencies, not here.
-See [extension policy](../CUSTOMIZATION.md#extension-architecture-decision).
+See [extension policy](../docs/CUSTOMIZATION.md#extension-architecture-decision).

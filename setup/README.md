@@ -1,21 +1,41 @@
 # Using Pi with Docker
 
 Run Pi in disposable containers with persistent projects, configuration, and
-sessions. Local inference uses the shared Ollama service; starting Pi does not
-start another model server.
+sessions. Local models are assumed to be available at a configured,
+host-accessible API URL. Setting up and managing model servers is outside this
+project's scope; starting Pi does not start a model server.
 
-- [Initial installation](SETUP.md)
-- [OpenAI/provider login and GitHub authentication](AUTHENTICATION.md)
-- [Extensions, resource paths, and maintenance](CUSTOMIZATION.md)
-- [Herdr integration and diagnostics](HERDER_INTEGRATION.md)
+- [Initial installation](docs/SETUP.md)
+- [OpenAI/provider login and GitHub authentication](docs/AUTHENTICATION.md)
+- [Extensions, resource paths, and maintenance](docs/CUSTOMIZATION.md)
+- [Herdr integration and diagnostics](docs/HERDR_INTEGRATION.md)
+
+## Deployment layout
+
+This directory is mounted read-only at `/opt/pi-docker` inside Pi. Paths below
+are relative to this directory:
+
+| Path | Purpose |
+|---|---|
+| `AGENTS.md` | Agent entry point and guide index |
+| `Dockerfile`, `compose*.yaml`, `.dockerignore` | Image and container definitions |
+| `bin/` | Host commands: `build`, `pi`, `herdr-extension`, `stop-herdr` |
+| `lib/` | Internal launcher helpers |
+| `docs/` | Installation, authentication, customization, and Herdr guides |
+| `extensions/`, `skills/` | Agent resources and extension policy |
+
+Private runtime state stays in the repository's sibling `data/` directory,
+not in this read-only deployment mount. Existing container destinations for
+configuration, credentials, and sessions remain separate; see
+[persistence paths](docs/SETUP.md#directory-layout-and-persistence).
 
 ## Launching
 
-After [initial setup](SETUP.md), build the image on the host from this
+After [initial setup](docs/SETUP.md), build the image on the host from this
 deployment's repository root:
 
 ```bash
-./setup/pi/build-pi-docker.sh
+./setup/bin/build
 ```
 
 Run these commands on the host after installing the launcher. If the image is
@@ -52,7 +72,7 @@ authentication, plus the host's read-only `.gitconfig` and read-only
 `data/gh-config/` GitHub CLI configuration.
 
 Use separate Git worktrees for concurrent writing agents. See
-[security and concurrency](SETUP.md#security-and-concurrency) for shared-state risks.
+[security and concurrency](docs/SETUP.md#security-and-concurrency) for shared-state risks.
 
 ## Herdr
 
@@ -64,13 +84,13 @@ connected Herdr session, including other panes. Use only with trusted containers
 Use `--no-herdr` to disable preparation and socket access, or `--herdr` to require
 support rather than warn and fall back if preparation fails. Headless and
 maintenance invocations do not auto-enable support. See
-[Herdr integration](HERDER_INTEGRATION.md) for requirements, restore, and diagnostics.
+[Herdr integration](docs/HERDR_INTEGRATION.md) for requirements, restore, and diagnostics.
 
 ## GitHub CLI
 
 `gh` is available through Pi's shell tool for issues, PRs, and GitHub API queries.
 Optional private repository authentication uses a read-only mount of
-`data/gh-config/`; see [GitHub authentication](AUTHENTICATION.md#github-cli-optional).
+`data/gh-config/`; see [GitHub authentication](docs/AUTHENTICATION.md#github-cli-optional).
 For example, ask Pi to run `gh issue list`, `gh issue view 123`, or `gh pr checks`.
 Agree on confirmation rules before allowing remote changes such as posting
 comments, closing issues, or merging PRs. Installing `gh` does not automatically
@@ -83,4 +103,4 @@ configure Git pushes.
 - `/reload`: reload changed settings and mounted resources in that session.
 
 Deployment guides and source are readable at `/opt/pi-docker` inside the container.
-For reload/rebuild rules, see [applying changes](CUSTOMIZATION.md#applying-changes).
+For reload/rebuild rules, see [applying changes](docs/CUSTOMIZATION.md#applying-changes).
