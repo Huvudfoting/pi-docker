@@ -35,15 +35,16 @@ Ask the agent in ordinary language:
 - “Ask reviewer to summarize the README and bring back its answer.”
 - “Open a helper below me, ask it to reply with hello, and show me the response.”
 
-The agent executes the deployment-owned `docker-pi-herdr` skill's Python script.
+The agent executes the deployment-owned `pi-docker-herdr` skill's Python script.
 `start` creates one focus-preserving sibling and starts Docker-Pi; `ask` submits
 once to an explicit ready agent and returns bounded output. Blank terminals and
 general inspection remain with the official Herdr skill.
 
-Integrated launches advertise the skill and append its instructions from the
-read-only deployment mount. `/skill:docker-pi-herdr <request>` also invokes it
-explicitly. A fresh launch is needed to pick up changed appended instructions.
-The [skill](../skills/docker-pi-herdr/SKILL.md) documents commands and receipt handling.
+Integrated launches advertise both skills and load their instructions on demand;
+no full skill is appended to the system prompt. `/skill:pi-docker-herdr <request>`
+also invokes the adapter explicitly. It defers general operation and safety to
+upstream, adding only Docker launch requirements and receipt handling.
+The [skill](../skills/pi-docker-herdr/SKILL.md) documents commands and receipt handling.
 
 Helpers use `PI_DOCKER_HOST_WORKSPACE`, the selected host project root, even when
 the caller is in a subdirectory. Never substitute container `/workspace` or guess
@@ -71,19 +72,25 @@ replacement conversation.
 
 ## Maintenance and diagnostics
 
-Launch preparation manages the official reporter and bundled operating skill
-under one lock in `data/config/`. To manage them manually from the repository root:
+The image extracts the official operating skill using `herdr --skill` from its
+pinned CLI into `/usr/local/share/pi-skills/herdr/SKILL.md`, outside mounted shared
+configuration. CLI and skill updates require an image rebuild and new containers.
+
+Host launch preparation manages only the official reporter under a lock in
+`data/config/`. To manage it manually from the repository root:
 
 ```bash
-./setup/bin/herdr-extension install     # Update reporter; ensure official skill
+./setup/bin/herdr-extension install     # Update reporter
 ./setup/bin/herdr-extension ensure      # Prepare only when needed
-./setup/bin/herdr-extension uninstall   # Remove managed reporter and official skill
+./setup/bin/herdr-extension uninstall   # Remove managed reporter, not image skills
 ```
 
+Shared skills are not installed, updated or removed by host preparation.
+
 Uninstall retains credentials, sessions and launch records; use `--no-herdr` to
-prevent preparation on the next launch. Start a new Pi process after reporter
-changes; `/reload` refreshes discovered skills. The Docker-Pi helper skill remains
-deployment-owned, separate from these upstream resources.
+prevent preparation and explicit skill loading on the next launch. Start a new Pi
+process after reporter changes; `/reload` refreshes discovered skills. The
+Docker-Pi adapter remains deployment-owned under `setup/skills/pi-docker-herdr/`.
 
 The image pins Pi and the container Herdr CLI in `setup/bin/build`.
 Rebuild and start new containers to update them. Host Herdr is managed separately;

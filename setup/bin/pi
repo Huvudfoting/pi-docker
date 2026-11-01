@@ -116,10 +116,10 @@ prepare_environment() {
 launch_pi() {
   local skill_args=()
   if ((herdr)); then
-    # Keep helper instructions immediately available in integrated sessions.
+    # Advertise upstream operation and the Docker adapter; load on demand.
     skill_args=(
-      --skill /opt/pi-docker/skills/docker-pi-herdr
-      --append-system-prompt /opt/pi-docker/skills/docker-pi-herdr/SKILL.md
+      --skill /usr/local/share/pi-skills/herdr
+      --skill /opt/pi-docker/skills/pi-docker-herdr
     )
   fi
   exec docker compose "${compose_files[@]}" run --rm pi \

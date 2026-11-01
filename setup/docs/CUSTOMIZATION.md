@@ -28,13 +28,11 @@ automatic Python downloads; use the image-provided interpreter.
 
 ### Herdr-managed exception
 
-Host Herdr manages the official `herdr-agent-state.ts` reporter and operating
-skill under `data/config/`; do not vendor or modify them. Integrated launches
-prepare these resources automatically. The container CLI is image-managed;
-the Docker-Pi helper skill lives in `setup/skills/docker-pi-herdr/` and is loaded
-by the launcher. See [Herdr maintenance](HERDR_INTEGRATION.md#maintenance-and-diagnostics)
-for updates, removal and process refresh requirements. Use `--no-herdr` to skip
-preparation and socket exposure.
+Host Herdr manages the official reporter; the image owns the container CLI and
+operating skill. Do not vendor or modify upstream resources. See
+[Herdr maintenance](HERDR_INTEGRATION.md#maintenance-and-diagnostics) for resource
+paths, loading, updates, and removal. Use `--no-herdr` to skip preparation and
+socket exposure.
 
 ### Subscription usage extension
 

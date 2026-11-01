@@ -91,22 +91,19 @@ current workspace. `pi --help` shows launcher usage without requiring Docker;
 
 Install Herdr on the host, then launch `pi /absolute/path/to/project` inside a
 Herdr pane. Eligible interactive launches automatically install/update its
-official Pi extension and bundled operating skill in this deployment's shared
-configuration and enable support.
-To install/update explicitly instead:
+official Pi reporter in this deployment's shared configuration and enable support.
+To install/update the reporter explicitly instead:
 
 ```bash
 ./setup/bin/herdr-extension install
 ```
 
-Extension/skill preparation needs no image rebuild. The container Herdr CLI is
-installed from the version pinned in `setup/bin/build`; rebuild and
-start new containers when updating the pin. Potential host/server/container
-version mismatches are accepted without a runtime synchronization check. Enabled launches print a socket-access notice.
+Reporter preparation needs no image rebuild; the container CLI and operating
+skill are image-managed. Enabled launches print a socket-access notice.
 Use `--no-herdr` to prevent installation and socket exposure, or `--herdr` to
 require integration rather than warn and fall back on preparation failure. See
-[Herdr integration](HERDR_INTEGRATION.md) for requirements, updates/removal,
-restore, diagnostics, and socket security.
+[Herdr integration](HERDR_INTEGRATION.md) for skill loading, version management,
+updates/removal, restore, diagnostics, and socket security.
 
 ## Security and concurrency
 

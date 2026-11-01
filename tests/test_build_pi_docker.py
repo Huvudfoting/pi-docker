@@ -14,6 +14,33 @@ SOURCE = Path(__file__).resolve().parents[1]
 
 
 class BuildPiDockerTest(unittest.TestCase):
+    def test_image_extracts_skill_from_installed_cli_and_rejects_empty_output(self):
+        dockerfile = (SOURCE / 'setup/Dockerfile').read_text()
+        block = next(block for block in dockerfile.split('\n\n')
+                     if 'herdr --skill >' in block)
+        command = block[block.index('RUN ') + 4:].replace('\\\n', '')
+        self.assertIn('/usr/local/share/pi-skills/herdr/SKILL.md', command)
+        self.assertLess(command.index('herdr --version'), command.index('herdr --skill'))
+        # Exercise extraction without downloading/reinstalling the CLI.
+        command = command[command.index('mkdir -p /usr/local/share/pi-skills/herdr'):]
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            binary = root / 'herdr'
+            binary.write_text('#!/bin/sh\n[ "$1" = --skill ] || exit 64\n'
+                              'printf "%s" "$SKILL_TEXT"\nexit "$SKILL_EXIT"\n')
+            binary.chmod(0o755)
+            command = command.replace('/usr/local/share/pi-skills', str(root / 'skills'))
+            for text, exit_code, success in (('official skill', '0', True),
+                                              ('', '0', False), ('partial', '23', False)):
+                result = subprocess.run(['sh', '-c', command], capture_output=True, text=True,
+                                        env={**os.environ, 'PATH': f'{root}:{os.environ["PATH"]}',
+                                             'SKILL_TEXT': text, 'SKILL_EXIT': exit_code}, timeout=10)
+                self.assertEqual(result.returncode == 0, success, result.stderr)
+                if success:
+                    skill = root / 'skills/herdr/SKILL.md'
+                    self.assertEqual(skill.read_text(), text)
+                    self.assertEqual(skill.stat().st_mode & 0o777, 0o644)
+
     def test_pins_context_argument_boundaries_and_exit_status(self):
         with tempfile.TemporaryDirectory(prefix="pi build ") as temporary:
             root = Path(temporary)

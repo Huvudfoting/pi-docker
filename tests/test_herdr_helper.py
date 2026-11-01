@@ -10,7 +10,7 @@ import tempfile
 import time
 import unittest
 
-SCRIPT = Path(__file__).resolve().parents[1] / 'setup/skills/docker-pi-herdr/scripts/herdr-helper.py'
+SCRIPT = Path(__file__).resolve().parents[1] / 'setup/skills/pi-docker-herdr/scripts/herdr-helper.py'
 AGENT = dict(pane_id='w1:p2', terminal_id='terminal-2', name='helper', agent='pi',
              agent_status='idle', interactive_ready=True, launch_pending=False)
 FAKE = r'''#!/usr/bin/env python3

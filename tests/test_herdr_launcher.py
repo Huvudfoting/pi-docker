@@ -62,10 +62,6 @@ class HerdrLauncherTest(unittest.TestCase):
         extension.parent.mkdir(parents=True)
         extension.write_text("// managed test fixture v9\n")
         self.fake_herdr()
-        skill = self.root / 'data/config/skills/herdr'
-        skill.mkdir(parents=True)
-        (skill / 'SKILL.md').write_text('---\nname: herdr\ndescription: Official fixture\n---\n')
-        (skill / '.herdr-version').write_text('herdr 0.9.5\n')
 
     def make_socket(self, name):
         endpoint = self.root / name
@@ -202,7 +198,7 @@ class HerdrLauncherTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             call = json.loads(Path(self.env['HERDR_LOG']).read_text())
             self.assertEqual(call['config'], str(config))
-            self.assertEqual(call['args'], ['integration', 'uninstall', 'pi'] if action == ('uninstall',) else ['--version'])
+            self.assertEqual(call['args'], ['integration', 'uninstall', 'pi'] if action == ('uninstall',) else ['integration', 'install', 'pi'])
             self.assertNotIn(private.read_text(), result.stdout + result.stderr)
         self.assertFalse((config / "extensions/herdr-agent-state.ts").exists())
         self.assertEqual(private.read_text(), 'TEST-ONLY-secret-do-not-print')
@@ -245,7 +241,7 @@ class HerdrLauncherTest(unittest.TestCase):
         self.assertIn('including other panes', result.stderr)
         self.assertIn('--no-herdr', result.stderr)
         self.assertIn(str(self.setup / 'compose.herdr.yaml'), invocation['args'])
-        self.assertEqual(self.herdr_calls(), [['integration', 'status'], ['--version']])
+        self.assertEqual(self.herdr_calls(), [['integration', 'status']])
         self.assertEqual(extension.stat().st_mtime_ns, before)
 
     def test_auto_installs_missing_and_outdated_then_verifies(self):
@@ -265,7 +261,6 @@ class HerdrLauncherTest(unittest.TestCase):
                 self.assertIn('Herdr integration enabled', result.stderr)
                 self.assertEqual(self.herdr_calls(), [
                     ['integration', 'status'], ['integration', 'install', 'pi'], ['integration', 'status'],
-                    ['--version'], *([['--skill']] if content is None else []),
                 ])
                 self.assertIn('v9', extension.read_text())
                 self.assertIn('/pi/herdr-sessions/', invocation['env']['PI_SESSION_TARGET'])
@@ -337,7 +332,7 @@ class HerdrLauncherTest(unittest.TestCase):
         self.assertIn('Herdr integration enabled', result.stderr)
         call = json.loads(Path(self.env['HERDR_LOG']).read_text())
         self.assertEqual(call['config'], str(self.root / 'data/config'))
-        self.assertEqual(self.herdr_calls(), [['integration', 'status'], ['--version']])
+        self.assertEqual(self.herdr_calls(), [['integration', 'status']])
 
     def test_unknown_status_does_not_install_or_modify_extension(self):
         extension = self.root / 'data/config/extensions/herdr-agent-state.ts'
@@ -366,52 +361,24 @@ class HerdrLauncherTest(unittest.TestCase):
         self.assertEqual(self.herdr_calls().count(['integration', 'install', 'pi']), 1)
         self.assertEqual(self.herdr_calls().count(['integration', 'status']), 5)
 
-    def test_skill_refreshes_only_when_missing_or_version_changes(self):
+    def test_reporter_actions_do_not_modify_shared_skills(self):
         directory = self.root / 'data/config/skills/herdr'
-        skill, marker = directory / 'SKILL.md', directory / '.herdr-version'
-        installer = self.setup / 'bin/herdr-extension'
-        before = (skill.stat().st_mtime_ns, marker.stat().st_mtime_ns)
-        result = self.run_command(installer, 'ensure')
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(before, (skill.stat().st_mtime_ns, marker.stat().st_mtime_ns))
-        self.assertNotIn(['--skill'], self.herdr_calls())
-        for patch in ({'HERDR_VERSION': 'herdr 0.9.6'}, {}):
-            skill.unlink()
-            result = self.run_command(installer, 'ensure', env={**self.env, **patch})
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn('# Herdr', skill.read_text())
-            self.assertEqual(marker.read_text().strip(), patch.get('HERDR_VERSION', 'herdr 0.9.5'))
-        result = self.run_command(installer, 'ensure', env={**self.env, 'HERDR_VERSION': 'herdr 0.9.7'})
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(marker.read_text().strip(), 'herdr 0.9.7')
-        result = self.run_command(installer, 'uninstall')
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertFalse(skill.exists())
-        self.assertFalse(marker.exists())
-
-    def test_failed_skill_refresh_preserves_previous_copy_and_retries(self):
-        directory = self.root / 'data/config/skills/herdr'
+        directory.mkdir(parents=True)
+        (directory / 'SKILL.md').write_text('---\nname: herdr\ndescription: User skill fixture\n---\n')
         before = {p.name: p.read_bytes() for p in directory.iterdir()}
         installer = self.setup / 'bin/herdr-extension'
-        for failure in ('HERDR_SKILL_FAIL', 'HERDR_SKILL_EMPTY'):
-            result = self.run_command(installer, 'ensure', env={
-                **self.env, 'HERDR_VERSION': 'herdr 0.9.6', failure: '1',
-            })
-            self.assertNotEqual(result.returncode, 0)
-            self.assertEqual(before, {p.name: p.read_bytes() for p in directory.iterdir()})
-        result = self.run_command(installer, 'ensure', env={**self.env, 'HERDR_VERSION': 'herdr 0.9.6'})
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual((directory / '.herdr-version').read_text().strip(), 'herdr 0.9.6')
-
-    def test_concurrent_ensure_publishes_skill_once(self):
-        shutil.rmtree(self.root / 'data/config/skills')
-        with ThreadPoolExecutor(max_workers=4) as pool:
-            results = list(pool.map(lambda _: self.run_command(self.setup / 'bin/herdr-extension', 'ensure'), range(4)))
-        for result in results:
+        for action in ('ensure', 'install', 'uninstall'):
+            result = self.run_command(installer, action)
             self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.herdr_calls().count(['--skill']), 1)
-        directory = self.root / 'data/config/skills/herdr'
-        self.assertEqual(sorted(p.name for p in directory.iterdir()), ['.herdr-version', 'SKILL.md'])
+            self.assertEqual(before, {p.name: p.read_bytes() for p in directory.iterdir()})
+        self.assertNotIn(['--skill'], self.herdr_calls())
+        self.assertNotIn(['--version'], self.herdr_calls())
+
+    def test_fresh_ensure_does_not_create_shared_skills(self):
+        result = self.run_command(self.setup / 'bin/herdr-extension', 'ensure')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((self.root / 'data/config/skills').exists())
+        self.assertEqual(self.herdr_calls(), [['integration', 'status']])
 
     def test_conflicting_mode_flags_rejected_without_preparation(self):
         result, invocation = self.launch(self.project, '--herdr', '--no-herdr')
@@ -465,14 +432,13 @@ class HerdrLauncherTest(unittest.TestCase):
                 self.assertEqual(invocation['env']['PI_WORKSPACE'], str(self.project))
                 self.assertEqual(str(self.setup / 'compose.herdr.yaml') in invocation['args'], integrated)
                 self.assertEqual('--skill' in invocation['args'], integrated)
-                eager_skill = '/opt/pi-docker/skills/docker-pi-herdr/SKILL.md'
-                self.assertEqual(eager_skill in invocation['args'], integrated)
-                self.assertEqual(invocation['args'].count('--append-system-prompt'), 2 if integrated else 1)
+                self.assertNotIn('/opt/pi-docker/skills/pi-docker-herdr/SKILL.md', invocation['args'])
+                self.assertEqual(invocation['args'].count('--append-system-prompt'), 1)
                 if integrated:
                     index = invocation['args'].index('--skill')
                     self.assertEqual(invocation['args'][index:index + 4], [
-                        '--skill', '/opt/pi-docker/skills/docker-pi-herdr',
-                        '--append-system-prompt', eager_skill,
+                        '--skill', '/usr/local/share/pi-skills/herdr',
+                        '--skill', '/opt/pi-docker/skills/pi-docker-herdr',
                     ])
 
     def test_sibling_selection_has_explicit_project_and_separate_storage(self):
@@ -522,8 +488,8 @@ class HerdrLauncherTest(unittest.TestCase):
         self.assertEqual(restored["args"][-2:], ["--session", reference])
         index = restored['args'].index('--skill')
         self.assertEqual(restored['args'][index:index + 4], [
-            '--skill', '/opt/pi-docker/skills/docker-pi-herdr',
-            '--append-system-prompt', '/opt/pi-docker/skills/docker-pi-herdr/SKILL.md',
+            '--skill', '/usr/local/share/pi-skills/herdr',
+            '--skill', '/opt/pi-docker/skills/pi-docker-herdr',
         ])
 
     def test_missing_or_out_of_scope_restore_fails_without_launching(self):

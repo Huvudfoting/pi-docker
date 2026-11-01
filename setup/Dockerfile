@@ -25,6 +25,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Versions are selected in setup/bin/build, not independently here.
+# Extract the matching CLI's skill outside mounted configuration.
 ARG HERDR_VERSION
 RUN : "${HERDR_VERSION:?Build with setup/bin/build or pass HERDR_VERSION}" \
     && printf 'Building with Herdr v%s integration.\n' "$HERDR_VERSION" \
@@ -37,7 +38,11 @@ RUN : "${HERDR_VERSION:?Build with setup/bin/build or pass HERDR_VERSION}" \
         "https://github.com/herdrdev/herdr/releases/download/v${HERDR_VERSION}/herdr-linux-${arch}" \
         --output /usr/local/bin/herdr \
     && chmod 755 /usr/local/bin/herdr \
-    && test "$(herdr --version)" = "herdr ${HERDR_VERSION}"
+    && test "$(herdr --version)" = "herdr ${HERDR_VERSION}" \
+    && mkdir -p /usr/local/share/pi-skills/herdr \
+    && herdr --skill > /usr/local/share/pi-skills/herdr/SKILL.md \
+    && test -s /usr/local/share/pi-skills/herdr/SKILL.md \
+    && chmod 644 /usr/local/share/pi-skills/herdr/SKILL.md
 
 # Fail the build if either runtime or essential Python modules are unavailable.
 RUN gh --version \

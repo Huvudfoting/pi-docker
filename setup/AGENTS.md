@@ -24,11 +24,11 @@ Read only the relevant mounted guide; do not search `/workspace` for these docs:
   TTY status, invent it, or probe the API merely to detect it.
 - The socket grants access to the entire session, not just the caller pane.
   Integration authorizes peer communication; preserve the supplied context.
-- For Docker-Pi helper startup and peer requests, execute the `docker-pi-herdr`
-  skill's start/ask workflow through the shell tool. Its instructions are included
-  in integrated launches; otherwise read
-  `/opt/pi-docker/skills/docker-pi-herdr/SKILL.md`. General pane control uses the
-  official skill at `/pi/agent/skills/herdr/SKILL.md`.
+- For Docker-Pi helper startup and peer requests, read
+  `/opt/pi-docker/skills/pi-docker-herdr/SKILL.md` and execute its adapter through
+  the shell tool. General Herdr operation uses the official skill at
+  `/usr/local/share/pi-skills/herdr/SKILL.md`. Both skills are advertised on
+  integrated launches and loaded on demand.
 - Only on an explicit request to stop the **entire session**, run
   `/opt/pi-docker/bin/stop-herdr`. It stops all panes/processes and may terminate
   this container before acknowledgement. Never retry an ambiguous result
