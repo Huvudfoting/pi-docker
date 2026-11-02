@@ -1,16 +1,18 @@
 """Offline CLI-contract tests. No Herdr server or live pane control."""
 import json
 import os
+import shutil
 from pathlib import Path
 import signal
 import socket
 import subprocess
-import sys
 import tempfile
 import time
 import unittest
 
-SCRIPT = Path(__file__).resolve().parents[1] / 'setup/skills/pi-docker-herdr/scripts/herdr-helper.py'
+SCRIPT = Path(__file__).resolve().parents[1] / 'skills/pi-docker-herdr/scripts/herdr-helper.js'
+# Absolute path also permits testing a missing Herdr CLI with PATH=/absent.
+NODE = shutil.which('node')
 AGENT = dict(pane_id='w1:p2', terminal_id='terminal-2', name='helper', agent='pi',
              agent_status='idle', interactive_ready=True, launch_pending=False)
 FAKE = r'''#!/usr/bin/env python3
@@ -42,6 +44,7 @@ def error(code='timeout'):
     return {'error': {'code': code, 'message': 'original upstream message', 'data': {'preserve': True}}}
 
 
+@unittest.skipUnless(NODE, 'Node.js is required for adapter tests')
 class HelperTest(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -56,7 +59,8 @@ class HelperTest(unittest.TestCase):
         self.env = {**os.environ, 'PATH': f'{self.root}:{os.environ["PATH"]}',
                     'FAKE_ROOT': str(self.root), 'HERDR_ENV': '1', 'HERDR_PANE_ID': 'w1:p1',
                     'HERDR_SOCKET_PATH': str(self.root / 'context.sock'),
-                    'PI_DOCKER_HOST_WORKSPACE': '/host/a project\'s "quoted" root'}
+                    'PI_DOCKER_HOST_WORKSPACE': '/host/a project\'s "quoted" root',
+                    'PI_DOCKER_IMAGE': 'pi-docker:base'}
 
     def calls(self):
         log = self.root / 'calls'
@@ -65,7 +69,7 @@ class HelperTest(unittest.TestCase):
     def launch(self, steps, *args, env=None):
         (self.root / 'steps').write_text(json.dumps(steps))
         (self.root / 'calls').unlink(missing_ok=True)
-        result = subprocess.run([sys.executable, str(SCRIPT), *args], env=env or self.env,
+        result = subprocess.run([NODE, str(SCRIPT), *args], env=env or self.env,
                                 capture_output=True, text=True, timeout=8)
         self.assertEqual(result.stderr, '', result.stderr)
         receipt = json.loads(result.stdout)
@@ -98,8 +102,27 @@ class HelperTest(unittest.TestCase):
                      self.env['PI_DOCKER_HOST_WORKSPACE'], '--no-focus']])
                 self.assertEqual(calls[3], ['agent', 'start', 'helper', '--kind', 'pi', '--pane', 'w1:p2',
                                            '--timeout', '120000', '--', self.env['PI_DOCKER_HOST_WORKSPACE'],
-                                           '--name', 'helper', '--herdr'])
+                                           '--name', 'helper', '--image', 'pi-docker:base', '--herdr'])
                 self.assertEqual(calls[4], ['agent', 'get', 'w1:p2'])
+
+    def test_helper_preserves_selected_image_and_rejects_invalid_image_before_split(self):
+        code, r, calls = self.launch(self.start_steps(), 'start', '--name', 'helper',
+                                     env={**self.env, 'PI_DOCKER_IMAGE': 'registry.example/dev/pi:custom'})
+        self.assertEqual(code, 0, r)
+        self.assertEqual(r['image'], 'registry.example/dev/pi:custom')
+        self.assertEqual(calls[3][-3:], ['--image', 'registry.example/dev/pi:custom', '--herdr'])
+        for image in ['--privileged', 'bad image', 'image\n']:
+            code, r, calls = self.launch([], 'start', '--name', 'helper',
+                                         env={**self.env, 'PI_DOCKER_IMAGE': image})
+            self.assertEqual(code, 2, r)
+            self.assertEqual(calls, [])
+
+    def test_helper_without_image_metadata_uses_current_base_tag(self):
+        env = {key: value for key, value in self.env.items() if key != 'PI_DOCKER_IMAGE'}
+        code, r, calls = self.launch(self.start_steps(), 'start', '--name', 'helper', env=env)
+        self.assertEqual(code, 0, r)
+        self.assertEqual(r['image'], 'pi-docker:base')
+        self.assertEqual(calls[3][-3:], ['--image', 'pi-docker:base', '--herdr'])
 
     def test_explicit_direction_skips_geometry(self):
         steps = self.start_steps(); del steps[1]
@@ -141,6 +164,45 @@ class HelperTest(unittest.TestCase):
             with self.subTest(patch=patch):
                 code, r, calls = self.launch([], 'start', '--name', 'helper', env={**self.env, **patch})
                 self.assertEqual(code, 2, r); self.assertEqual(calls, [])
+
+    def test_adapter_runs_without_python_on_path(self):
+        # The host test suite uses Python; the container-side adapter must not.
+        binary = self.root / 'herdr'
+        binary.write_text(f'#!{NODE}\n'
+                          'const fs = require("node:fs");\n'
+                          'const root = process.env.FAKE_ROOT;\n'
+                          'fs.appendFileSync(root + "/node-calls", JSON.stringify(process.argv.slice(2)) + "\\n");\n'
+                          'console.log(JSON.stringify({result:{agents:[{name:"helper"}]}}));\n')
+        code, r, calls = self.launch([], 'start', '--name', 'helper',
+                                     env={**self.env, 'PATH': str(self.root)})
+        self.assertEqual(code, 1, r)
+        self.assertEqual(r['error']['code'], 'duplicate_name')
+        self.assertEqual((self.root / 'node-calls').read_text(), '["agent","list"]\n')
+
+    def test_option_values_and_full_string_validation(self):
+        code, r, calls = self.launch(self.ask_steps(), 'ask', '--target=helper', '--prompt=--help')
+        self.assertEqual(code, 0, r)
+        self.assertEqual(calls[1][3], '--help')
+        for args in [('start', '--name', 'helper\n'),
+                     ('ask', '--target', 'w1:p2\n', '--prompt', 'ok'),
+                     ('ask', '--target', 'helper', '--prompt', 'ok', '--lines', '1.5'),
+                     ('ask', '--target', 'helper', '--prompt', 'é' * 16385)]:
+            code, r, calls = self.launch([], *args)
+            self.assertEqual(code, 2, r)
+            self.assertEqual(calls, [])
+        code, r, calls = self.launch([agent(pane_id='w1:p2\n')], 'ask', '--target', 'helper', '--prompt', 'ok')
+        self.assertEqual(r['error']['code'], 'malformed_response')
+        self.assertEqual(len(calls), 1)
+
+    def test_unicode_excerpt_is_bounded_without_corrupting_utf8(self):
+        steps = self.ask_steps()
+        steps[3] = {'stdout': 'é' + '🙂' * 5000 + '\n'}
+        code, r, calls = self.launch(steps, 'ask', '--target', 'helper', '--prompt', 'ok')
+        self.assertEqual(code, 0, r)
+        self.assertTrue(r['output']['truncated'])
+        self.assertLessEqual(len(r['output']['text'].encode()), 16384)
+        self.assertNotIn('�', r['output']['text'])
+        self.assertEqual(set(r['output']['text']), {'🙂'})
 
     def test_missing_cli_structured(self):
         code, r, calls = self.launch([], 'start', '--name', 'helper', env={**self.env, 'PATH': '/absent'})
@@ -256,7 +318,7 @@ class HelperTest(unittest.TestCase):
                 with self.subTest(operation=operation, sig=sig):
                     (self.root / 'steps').write_text(json.dumps(steps))
                     (self.root / 'calls').unlink(missing_ok=True)
-                    proc = subprocess.Popen([sys.executable, str(SCRIPT), operation, *args], env=self.env,
+                    proc = subprocess.Popen([NODE, str(SCRIPT), operation, *args], env=self.env,
                                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                     try:
                         end = time.monotonic() + 3
@@ -311,6 +373,55 @@ class HelperTest(unittest.TestCase):
         code, r, calls = self.launch(self.ask_steps(), 'ask', '--target', 'helper', '--prompt', 'ok',
                                      env={**self.env, 'PI_DOCKER_HOST_WORKSPACE': ''})
         self.assertEqual(code, 0, r)
+
+    def test_deep_upstream_errors_preserve_receipt_after_submission(self):
+        # Build raw JSON so the host's own JSON recursion limit is not involved.
+        nested = '[' * 10000 + '0' + ']' * 10000
+        wire = '{"error":{"code":"timeout","message":"nested","data":' + nested + '}}'
+        for response, expected in [({'stderr': wire, 'exit': 1}, 'cli_failed'),
+                                   ({'stdout': wire}, 'malformed_response')]:
+            with self.subTest(expected=expected):
+                code, r, calls = self.launch([agent(), response, {'stdout': 'evidence'}],
+                                             'ask', '--target', 'helper', '--prompt', 'ok')
+                self.assertEqual(code, 1, r)
+                self.assertEqual(r['error']['code'], expected)
+                self.assertEqual(r['status'], 'partial_failure')
+                self.assertEqual(r['delivery'], 'uncertain')
+                self.assertEqual(r['pane_id'], 'w1:p2')
+                self.assertEqual(r['agent'], AGENT)
+                self.assertEqual(r['diagnostic']['text'], 'evidence')
+                self.assertEqual(sum(c[:2] == ['agent', 'prompt'] for c in calls), 1)
+
+    def test_deep_agent_metadata_preserves_acknowledged_delivery(self):
+        nested = '{"child":' * 10000 + '0' + '}' * 10000
+        wire = '{"result":{"agent":' + json.dumps(AGENT)[:-1] + ',"metadata":' + nested + '}}}'
+        steps = self.ask_steps()[:2] + [{'stdout': wire}, {'stdout': 'evidence'}]
+        code, r, calls = self.launch(steps, 'ask', '--target', 'helper', '--prompt', 'ok')
+        self.assertEqual(code, 1, r)
+        self.assertEqual(r['error']['code'], 'malformed_response')
+        self.assertEqual(r['status'], 'partial_failure')
+        self.assertEqual(r['delivery'], 'acknowledged')
+        self.assertEqual(r['pane_id'], 'w1:p2')
+        self.assertEqual(r['agent'], {**AGENT, 'agent_status': 'done'})
+        self.assertEqual(sum(c[:2] == ['agent', 'prompt'] for c in calls), 1)
+
+    def test_response_nesting_boundary(self):
+        # Envelope/result/agent consume depths 0/1/2; metadata starts at 3.
+        for levels, expected_code in [(62, 0), (63, 1)]:
+            with self.subTest(levels=levels):
+                nested = '[' * levels + '0' + ']' * levels
+                wire = '{"result":{"agent":' + json.dumps(AGENT)[:-1] + ',"metadata":' + nested + '}}}'
+                steps = self.ask_steps()
+                steps[4] = {'stdout': wire}
+                if expected_code:
+                    steps.append({'stdout': 'evidence'})
+                code, r, calls = self.launch(steps, 'ask', '--target', 'helper', '--prompt', 'ok')
+                self.assertEqual(code, expected_code, r)
+                if expected_code:
+                    self.assertEqual(r['error']['code'], 'malformed_response')
+                    self.assertEqual(r['delivery'], 'acknowledged')
+                else:
+                    self.assertIn('metadata', r['agent'])
 
     def test_response_size_syntax_error_and_malformed_prompt_receipt(self):
         for step, expected in [({'stdout': 'x' * (1024 * 1024 + 1)}, 'response_too_large'),

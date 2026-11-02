@@ -1,15 +1,19 @@
-# Herdr-specific support for setup/bin/pi; source only, not an executable.
-# The launcher supplies script/setup/root and fail(). Selection state is
-# workspace/name/session. Only herdr_load_restore changes workspace/name and
+# Herdr-specific support for bin/pi; source only, not an executable.
+# The launcher supplies script/root and fail(). Selection state is
+# workspace/name/image/session. Only herdr_load_restore changes workspace/name/image and
 # sets restore_ref/restore_filename; herdr_prepare sets container environment.
 
 readonly HERDR_SESSION_NAMESPACE=/pi/herdr-sessions
 readonly HERDR_RECORDS="$root/data/herdr-launches"
 readonly HERDR_EXTENSION="$root/data/config/extensions/herdr-agent-state.ts"
-readonly HERDR_INSTALL_COMMAND='setup/bin/herdr-extension install'
+readonly HERDR_INSTALL_COMMAND='bin/herdr-extension install'
 
 herdr_storage_key() {
-  printf '%s\0%s' "$workspace" "$name" | sha256sum | cut -d' ' -f1
+  # Only the historical pi-agent:latest uses image-less v1 keys.
+  # Every other tag (including pi-docker:base) gets an image-aware v2 namespace.
+  { printf '%s\0%s' "$workspace" "$name"
+    if [[ "$image" != pi-agent:latest ]]; then printf '\0%s' "$image"; fi
+  } | sha256sum | cut -d' ' -f1
 }
 
 herdr_is_restore_request() {
@@ -44,12 +48,18 @@ herdr_load_restore() {
   {
     IFS= read -r -d '' version && IFS= read -r -d '' workspace && IFS= read -r -d '' name \
       || fail "Incomplete Herdr launch record: $record"
+    case "$version" in
+      pi-docker-herdr-v1) image=pi-agent:latest ;;
+      pi-docker-herdr-v2)
+        IFS= read -r -d '' image || fail "Incomplete Herdr launch record: $record" ;;
+      *) fail "Invalid Herdr launch record: $record" ;;
+    esac
     extra=""
     if IFS= read -r -d '' extra || [[ -n "$extra" ]]; then
       fail "Unexpected data in Herdr launch record: $record"
     fi
   } < "$record"
-  [[ "$version" == pi-docker-herdr-v1 && "$workspace" == /* && -n "$name" ]] \
+  [[ "$workspace" == /* && -n "$name" && -n "$image" ]] \
     || fail "Invalid Herdr launch record: $record"
   [[ "$(herdr_storage_key)" == "$key" ]] || fail "Herdr launch record does not match its storage key"
   [[ "$(realpath -e -- "$workspace" 2>/dev/null)" == "$workspace" && -d "$workspace" ]] \
@@ -124,7 +134,12 @@ herdr_save_record() (
   mkdir -p "$HERDR_RECORDS"
   temporary="$(mktemp "$HERDR_RECORDS/.launch.XXXXXX")"
   trap 'rm -f -- "$temporary"' EXIT
-  printf '%s\0%s\0%s\0' pi-docker-herdr-v1 "$workspace" "$name" > "$temporary"
+  if [[ "$image" == pi-agent:latest ]]; then
+    # Preserve v1 serialization only for explicit legacy-image launches.
+    printf '%s\0%s\0%s\0' pi-docker-herdr-v1 "$workspace" "$name" > "$temporary"
+  else
+    printf '%s\0%s\0%s\0%s\0' pi-docker-herdr-v2 "$workspace" "$name" "$image" > "$temporary"
+  fi
   if [[ -e "$record" ]] && ! cmp -s -- "$temporary" "$record"; then
     fail "Conflicting Herdr launch record: $record"
   fi
@@ -150,7 +165,7 @@ herdr_show_status() {
   key="$(herdr_storage_key)"
   record="$HERDR_RECORDS/$key.record"
   printf 'Docker-Pi Herdr: local diagnostics only (no connection or image checks)\n'
-  printf 'Workspace: %q\nStorage name: %q\nHost sessions: %q\n' "$workspace" "$name" "$session"
+  printf 'Workspace: %q\nStorage name: %q\nHost sessions: %q\nImage: %q\n' "$workspace" "$name" "$session" "$image"
   printf 'Herdr session target: %s/%s\n' "$HERDR_SESSION_NAMESPACE" "$key"
   if herdr_has_extension; then
     printf 'Official extension: present, readable (%q)\n' "$HERDR_EXTENSION"
@@ -192,7 +207,7 @@ herdr_show_status() {
   if [[ -n "$pi_path" && "$(realpath -- "$pi_path")" == "$script" ]]; then
     printf 'Native restore PATH: pi resolves to this launcher\n'
   else
-    printf 'Native restore PATH: pi does not resolve to this launcher; see setup/docs/SETUP.md (host launcher symlink)\n'
+    printf 'Native restore PATH: pi does not resolve to this launcher; see docs/SETUP.md (host launcher symlink)\n'
     issues=1
   fi
   if [[ -t 0 && -t 1 ]]; then

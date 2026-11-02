@@ -3,21 +3,22 @@ set -euo pipefail
 
 # Resolve this deployment through symlinks, independently of the workspace.
 script="$(realpath -- "${BASH_SOURCE[0]}")"
-setup="$(dirname -- "$(dirname -- "$script")")"
-root="$(dirname -- "$setup")"
+root="$(dirname -- "$(dirname -- "$script")")"
 
 fail() { printf 'pi-docker: %s\n' "$*" >&2; exit 2; }
 
 # Herdr details live separately; sourcing the helper creates no persistent state.
-source "$setup/lib/herdr-launch.sh"
+source "$root/lib/herdr-launch.sh"
 
 show_help() {
-  printf '%s\n' 'Usage: pi [workspace] [--name NAME] [--no-host-gitconfig] [--herdr|--no-herdr] [-- PI_ARGS...]
+  printf '%s\n' 'Usage: pi [workspace] [--name NAME] [--image IMAGE] [--no-host-gitconfig] [--herdr|--no-herdr] [-- PI_ARGS...]
        pi [workspace] [--name NAME] --herdr-status
        pi --session <managed-session-path>  (native Herdr restore)
 
 Docker-Pi launcher options (before Pi arguments):
   --name NAME       Select session storage, not the conversation title.
+  --image IMAGE     Override PI_DOCKER_IMAGE; otherwise prefer local custom, then base.
+                    Use --image pi-docker:base to force the base image.
   --no-host-gitconfig  Do not mount the host ~/.gitconfig.
   --herdr           Require Herdr reporting and native restore (local Linux).
   --no-herdr        Disable detection, installation, and Herdr socket exposure.
@@ -33,12 +34,13 @@ access to the full Herdr API. Auto preparation failures warn and launch without
 integration; explicit --herdr and native restore fail instead.
 Use --continue or --resume for existing sessions. Herdr mode rejects headless
 modes, custom session paths/directories, --no-session, and --no-extensions.
-Original CLI flags are not replayed on restore. Questionnaire blocked events
+The selected image is preserved for helpers and native restore; other original
+CLI flags are not replayed on restore. Questionnaire blocked events
 are not yet bridged; socket replacement recovery is not guaranteed.
 
 Install/update the official extension on the host, from the docker-pi repo root:
-  setup/bin/herdr-extension install
-Usage: setup/docs/HERDR_INTEGRATION.md'
+  bin/herdr-extension install
+Usage: docs/HERDR_INTEGRATION.md'
 }
 
 parse_arguments() {
@@ -47,6 +49,7 @@ parse_arguments() {
     [[ $# == 2 ]] || fail "Managed restore accepts only: pi --session <managed-path>"
     herdr_mode=required
     herdr_load_restore "$2"
+    auto_image=0
     pi_args=("$@")
     return
   fi
@@ -60,6 +63,11 @@ parse_arguments() {
       --name)
         [[ $# -ge 2 ]] || fail "--name needs a value"
         name="$2"
+        shift 2 ;;
+      --image)
+        [[ $# -ge 2 && -n "$2" ]] || fail "--image needs a nonempty value"
+        image="$2"
+        auto_image=0
         shift 2 ;;
       --herdr|--no-herdr)
         [[ "$herdr_mode" == auto ]] || fail "Choose only one of --herdr and --no-herdr"
@@ -77,6 +85,8 @@ parse_arguments() {
 
 resolve_selection() {
   local resolved hash
+  [[ "$image" =~ ^[a-zA-Z0-9][a-zA-Z0-9._/:@-]*$ ]] \
+    || fail "Invalid image reference: $image"
   resolved="$(realpath -e -- "$workspace" 2>/dev/null)" \
     || fail "Workspace does not exist: $workspace. Supply an existing project directory as the first argument."
   workspace="$resolved"
@@ -92,10 +102,14 @@ resolve_selection() {
 require_docker() {
   command -v docker >/dev/null 2>&1 \
     || fail "Docker CLI not found. Run this launcher on the host with Docker Engine and the Compose plugin installed."
-  if ! docker image inspect pi-agent:latest >/dev/null 2>&1; then
-    printf '%s\n' 'pi-docker: Cannot inspect pi-agent:latest. Check that the Docker daemon is running and accessible.
-If the image is missing, build it on the host from the docker-pi repository root:
-  ./setup/bin/build' >&2
+  if ((auto_image)) && docker image inspect pi-docker:custom >/dev/null 2>&1; then
+    image=pi-docker:custom
+  fi
+  if ! docker image inspect "$image" >/dev/null 2>&1; then
+    printf 'pi-docker: Cannot inspect image %s. Check Docker access and build the selected image on the host.\n' "$image" >&2
+    printf '%s\n' 'Base: ./bin/build' \
+      'Custom example (after base): ./bin/build custom' \
+      'Other images: build/tag your derived image, then select it with --image.' >&2
     exit 1
   fi
 }
@@ -109,6 +123,7 @@ prepare_environment() {
   export PI_SESSIONS="$session"
   export PI_WORKSPACE="$workspace"
   export PI_SESSION_TARGET
+  export PI_DOCKER_IMAGE="$image"
   export PI_UID="$(id -u)"
   export PI_GID="$(id -g)"
   # This identifies only the host-side interactive wrapper, not the user's shell.
@@ -125,11 +140,7 @@ launch_pi() {
     )
   fi
   exec docker compose "${compose_files[@]}" run --rm pi \
-    --append-system-prompt /opt/pi-docker/AGENTS.md \
-    --extension /usr/local/lib/node_modules/pi-rewind-hook/index.ts \
-    --extension /usr/local/lib/node_modules/pi-web-access \
-    --extension /usr/local/lib/node_modules/@juicesharp/rpiv-ask-user-question \
-    --extension /usr/local/lib/node_modules/@specode/pi-subscription-usage \
+    --append-system-prompt /opt/pi-docker/docs/AGENTS.md \
     --extension /opt/pi-docker/extensions \
     "${skill_args[@]}" \
     "${pi_args[@]}"
@@ -138,6 +149,9 @@ launch_pi() {
 main() {
   # Selection and arguments are shared with the Herdr helper, never re-parsed.
   workspace="$PWD"
+  image="${PI_DOCKER_IMAGE:-pi-docker:base}"
+  auto_image=0
+  [[ -n "${PI_DOCKER_IMAGE:-}" ]] || auto_image=1
   name=""
   herdr=0
   herdr_mode=auto
@@ -159,10 +173,10 @@ main() {
 
   require_docker
   PI_SESSION_TARGET=/pi/sessions
-  compose_files=(-f "$setup/compose.yaml")
+  compose_files=(-f "$root/compose.yaml")
   if ((host_gitconfig)) && [[ -f "$HOME/.gitconfig" && -r "$HOME/.gitconfig" ]]; then
     export PI_GITCONFIG="$HOME/.gitconfig"
-    compose_files+=(-f "$setup/compose.git.yaml")
+    compose_files+=(-f "$root/compose.git.yaml")
   fi
   herdr_select_mode "${pi_args[@]}"
   if ((herdr)); then
@@ -172,9 +186,9 @@ main() {
     else
       herdr_validate_arguments "${pi_args[@]}"
     fi
-    if "$setup/bin/herdr-extension" ensure >&2; then
+    if "$root/bin/herdr-extension" ensure >&2; then
       herdr_prepare
-      compose_files+=(-f "$setup/compose.herdr.yaml")
+      compose_files+=(-f "$root/compose.herdr.yaml")
       printf 'pi-docker: Herdr integration enabled. The container can control the connected\n  Herdr session, including other panes. Use --no-herdr to disable.\n' >&2
     elif [[ "$herdr_mode" == auto ]]; then
       herdr=0

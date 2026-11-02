@@ -1,0 +1,42 @@
+x-readonly-bind: &readonly-bind
+  type: bind
+  read_only: true
+  bind:
+    create_host_path: false
+
+services:
+  pi:
+    image: "${PI_DOCKER_IMAGE:-pi-docker:base}"
+    init: true
+    stdin_open: true
+    tty: true
+    user: "${PI_UID:-1000}:${PI_GID:-1000}"
+    environment:
+      HOME: /home/node
+      PI_DOCKER_IMAGE: "${PI_DOCKER_IMAGE:-pi-docker:base}"
+      PI_CODING_AGENT_DIR: /pi/agent
+      PI_CODING_AGENT_SESSION_DIR: "${PI_SESSION_TARGET:-/pi/sessions}"
+      GH_CONFIG_DIR: /run/gh-config
+    volumes:
+      - ${PI_CONFIG:?}:/pi/agent
+      - ${PI_SESSIONS:?}:${PI_SESSION_TARGET:-/pi/sessions}
+      - ${PI_WORKSPACE:?}:/workspace
+      - { <<: *readonly-bind, source: "${GH_CONFIG:?}", target: /run/gh-config }
+      # Never mount repository root here: it contains private data/ and .git/.
+      # Expose only these deployment paths at the stable container namespace.
+      - { <<: *readonly-bind, source: ./bin, target: /opt/pi-docker/bin }
+      - { <<: *readonly-bind, source: ./lib, target: /opt/pi-docker/lib }
+      - { <<: *readonly-bind, source: ./docs, target: /opt/pi-docker/docs }
+      - { <<: *readonly-bind, source: ./extensions, target: /opt/pi-docker/extensions }
+      - { <<: *readonly-bind, source: ./skills, target: /opt/pi-docker/skills }
+      - { <<: *readonly-bind, source: ./images, target: /opt/pi-docker/images }
+      - { <<: *readonly-bind, source: ./README.md, target: /opt/pi-docker/README.md }
+      - { <<: *readonly-bind, source: ./compose.yaml, target: /opt/pi-docker/compose.yaml }
+      - { <<: *readonly-bind, source: ./compose.git.yaml, target: /opt/pi-docker/compose.git.yaml }
+      - { <<: *readonly-bind, source: ./compose.herdr.yaml, target: /opt/pi-docker/compose.herdr.yaml }
+    working_dir: /workspace
+    network_mode: host
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL

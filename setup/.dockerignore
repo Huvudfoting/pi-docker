@@ -1,5 +1,0 @@
-# Deployment source is mounted at runtime. The build needs no local files.
-# Keep the context minimal; explicitly allow inputs here if COPY/ADD is introduced.
-**
-!Dockerfile
-!.dockerignore

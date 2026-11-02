@@ -5,6 +5,7 @@ The real Herdr launch/restart trial still runs on the host.
 """
 
 from concurrent.futures import ThreadPoolExecutor
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -25,14 +26,18 @@ class HerdrLauncherTest(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix="pi-herdr-")
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        self.setup = self.root / "setup"
-        shutil.copytree(SOURCE / "setup", self.setup)
+        # Copy deployment inputs only, never the real repository's data/ or .git/.
+        self.setup = self.root
+        for directory in ['bin', 'lib', 'docs', 'extensions', 'skills', 'images']:
+            shutil.copytree(SOURCE / directory, self.root / directory)
+        for filename in ['README.md', 'compose.yaml', 'compose.git.yaml', 'compose.herdr.yaml']:
+            shutil.copy2(SOURCE / filename, self.root / filename)
         self.project = self.root / "project with 'quotes'"
         self.project.mkdir()
         self.other = self.root / "other"
         self.other.mkdir()
         self.log = self.root / "docker.json"
-        self.bin = self.root / "bin"
+        self.bin = self.root / "fake-bin"
         self.bin.mkdir()
         (self.bin / "pi").symlink_to(self.setup / "bin/pi")
         self.probes = self.root / "docker-probes.log"
@@ -40,10 +45,10 @@ class HerdrLauncherTest(unittest.TestCase):
         docker.write_text(
             f"#!{sys.executable}\n"
             "import json, os, sys\n"
-            "with open(os.environ['DOCKER_PROBE_LOG'], 'a') as f: f.write('called\\n')\n"
-            "if sys.argv[1:3] == ['image', 'inspect']: sys.exit(0)\n"
+            "with open(os.environ['DOCKER_PROBE_LOG'], 'a') as f: f.write(json.dumps(sys.argv[1:]) + '\\n')\n"
+            "if sys.argv[1:3] == ['image', 'inspect']: sys.exit(1 if os.environ.get('MISSING_IMAGE') == sys.argv[3] else 0)\n"
             "keys = ['PI_WORKSPACE', 'PI_SESSIONS', 'PI_SESSION_TARGET', "
-            "'HERDR_ENV', 'HERDR_PANE_ID', 'HERDR_SOCKET_HOST_PATH', 'HERDR_AGENT', 'PI_GITCONFIG']\n"
+            "'HERDR_ENV', 'HERDR_PANE_ID', 'HERDR_SOCKET_HOST_PATH', 'HERDR_AGENT', 'PI_GITCONFIG', 'PI_DOCKER_IMAGE']\n"
             "with open(os.environ['DOCKER_LOG'], 'w') as f:\n"
             "    json.dump({'args': sys.argv[1:], 'env': {k: os.environ.get(k) for k in keys}}, f)\n"
             "sys.exit(int(os.environ.get('DOCKER_EXIT', '0')))\n"
@@ -55,6 +60,7 @@ class HerdrLauncherTest(unittest.TestCase):
             "HOME": str(self.root),
             "DOCKER_LOG": str(self.log),
             "DOCKER_PROBE_LOG": str(self.probes),
+            "MISSING_IMAGE": "pi-docker:custom",
         }
         self.sock = self.make_socket("herdr.sock")
         self.env.update(HERDR_ENV="1", HERDR_PANE_ID="w1:p1", HERDR_SOCKET_PATH=str(self.sock))
@@ -147,6 +153,83 @@ class HerdrLauncherTest(unittest.TestCase):
             "compose", "-f", str(self.setup / "compose.yaml"),
         ])
 
+    def test_image_selection_and_base_has_no_custom_extension_paths(self):
+        for cli, configured, expected in [([], None, 'pi-docker:base'),
+                                           (['--image', 'pi-docker:base'], 'pi-docker:custom', 'pi-docker:base'),
+                                           ([], 'pi-docker:custom', 'pi-docker:custom'),
+                                           (['--image', 'registry.example/pi:dev'], 'pi-docker:custom', 'registry.example/pi:dev')]:
+            env = dict(self.env)
+            if configured:
+                env['PI_DOCKER_IMAGE'] = configured
+                env.pop('MISSING_IMAGE')
+            result, invocation = self.launch(self.project, '--name', 'backend', '--no-herdr', *cli, env=env)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(invocation['env']['PI_DOCKER_IMAGE'], expected)
+            self.assertEqual(json.loads(self.probes.read_text().splitlines()[-2]), ['image', 'inspect', expected])
+            self.assertNotIn('--image', invocation['args'])
+            self.assertFalse(any('/usr/local/lib/node_modules/' in a for a in invocation['args']))
+            self.assertNotIn('/usr/local/share/pi-custom/skills', invocation['args'])
+        for args in [('--image',), ('--image', ''), ('--image', '--privileged'), ('--image', 'bad image')]:
+            result, invocation = self.launch(self.project, '--name', 'backend', *args)
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertIsNone(invocation)
+
+    def test_available_custom_is_preferred_but_explicit_base_wins(self):
+        env = {k: v for k, v in self.env.items() if k != 'MISSING_IMAGE'}
+        for cli, configured, expected in [([], None, 'pi-docker:custom'),
+                                           (['--image', 'pi-docker:base'], None, 'pi-docker:base'),
+                                           ([], 'pi-docker:base', 'pi-docker:base')]:
+            selected_env = dict(env)
+            if configured:
+                selected_env['PI_DOCKER_IMAGE'] = configured
+            self.probes.unlink(missing_ok=True)
+            result, invocation = self.launch(self.other, '--no-herdr', *cli, env=selected_env)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(invocation['env']['PI_DOCKER_IMAGE'], expected)
+            probes = [json.loads(line) for line in self.probes.read_text().splitlines()]
+            if expected == 'pi-docker:base':
+                self.assertNotIn(['image', 'inspect', 'pi-docker:custom'], probes)
+
+    def test_missing_selected_image_fails_before_preparation(self):
+        result, invocation = self.launch(self.other, '--image', 'missing:dev',
+                                         env={**self.env, 'MISSING_IMAGE': 'missing:dev'})
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIsNone(invocation)
+        self.assertIn('missing:dev', result.stderr)
+        self.assertIn('./bin/build custom', result.stderr)
+        self.assertEqual(self.herdr_calls(), [])
+        self.assertFalse((self.root / 'data/sessions').exists())
+        self.assertFalse((self.root / 'data/herdr-launches').exists())
+
+    def test_native_restore_preserves_new_and_legacy_image_records(self):
+        self.env.pop('MISSING_IMAGE')
+        result, original = self.launch(self.project, '--name', 'backend', '--image', 'pi-docker:base', '--herdr')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(original['env']['PI_DOCKER_IMAGE'], 'pi-docker:base')
+        filename = 'image-test.jsonl'
+        # Old v1 keys and v2 literal image references must both stay usable.
+        for image in ['pi-docker:custom', 'pi-agent:latest', 'pi-agent:custom', 'pi-agent:personal']:
+            result, selected = self.launch(self.project, '--name', 'backend', '--image', image, '--herdr')
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertNotEqual(original['env']['PI_SESSION_TARGET'], selected['env']['PI_SESSION_TARGET'])
+            if image == 'pi-agent:latest':
+                legacy_key = hashlib.sha256(f'{self.project}\0backend'.encode()).hexdigest()
+                self.assertEqual(selected['env']['PI_SESSION_TARGET'], f'/pi/herdr-sessions/{legacy_key}')
+            (Path(selected['env']['PI_SESSIONS']) / filename).touch()
+            result, restored = self.launch('--session', f"{selected['env']['PI_SESSION_TARGET']}/{filename}",
+                                          env={**self.env, 'PI_DOCKER_IMAGE': 'unrelated:latest'})
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(restored['env']['PI_DOCKER_IMAGE'], image)
+            self.assertEqual(restored['env']['PI_SESSION_TARGET'], selected['env']['PI_SESSION_TARGET'])
+        records = [r.read_bytes() for r in (self.root / 'data/herdr-launches').glob('*.record')]
+        self.assertTrue(any(r.startswith(b'pi-docker-herdr-v1\0') for r in records))
+        self.assertTrue(any(r.endswith(b'pi-agent:custom\0') for r in records))
+        self.assertTrue(any(r.startswith(b'pi-docker-herdr-v2\0') and r.endswith(b'pi-docker:base\0') for r in records))
+        result, restored = self.launch('--session', f"{original['env']['PI_SESSION_TARGET']}/{filename}",
+                                      env={**self.env, 'PI_DOCKER_IMAGE': 'pi-docker:custom'})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(restored['env']['PI_DOCKER_IMAGE'], 'pi-docker:base')
+
     def test_gitconfig_is_optional_read_only_and_can_be_disabled(self):
         config = self.root / '.gitconfig'
         result, invocation = self.launch(self.other, '--no-herdr')
@@ -212,7 +295,7 @@ class HerdrLauncherTest(unittest.TestCase):
         result = self.run_command(self.setup / "bin/pi", "--help")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("--herdr-status", result.stdout)
-        self.assertIn("setup/bin/herdr-extension install", result.stdout)
+        self.assertIn("bin/herdr-extension install", result.stdout)
         self.assertNotIn(str(self.root), result.stdout)
         self.assertNotRegex(result.stdout, r"(?:^|\s)/[^\s]*")
         result = self.run_command(self.setup / "bin/pi", str(self.project), "--name", "backend", "--herdr-status")

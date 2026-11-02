@@ -1,47 +1,58 @@
 # Pi Docker + Herdr
 
-Run Pi in disposable Docker containers with persistent projects, configuration,
-and sessions. Use configured cloud providers or local models available at a
-host-accessible API URL. Setting up and managing model servers is outside this
-project's scope.
+Run Pi in disposable Docker containers while keeping projects, configuration,
+credentials, and conversations on the host. Optional Herdr integration adds
+reporting, conversation restore, and helper/peer workflows.
 
-Images always include Herdr support, but using it is optional. Inside Herdr,
-eligible interactive launches enable agent reporting, conversation
-restore and a focused skill for sibling helpers and peer requests. Use
-`--no-herdr` to disable integration or `--herdr` to require it. See the
-[Herdr guide](setup/docs/HERDR_INTEGRATION.md) for usage and session-wide socket access.
+## Quick start
 
-## Get started
-
-Follow [installation](setup/docs/SETUP.md), then run on the host:
+On a Linux host with Docker Engine and Compose, from this repository:
 
 ```bash
+./bin/build          # base image
+# ./bin/build custom # optional development image; requires base
+mkdir -p ~/.local/bin
+ln -sfn "$(pwd)/bin/pi" ~/.local/bin/pi
+# Ensure ~/.local/bin is on PATH, then choose an existing project:
 pi ~/repos/project
 ```
 
-`pi --help` gives an overview of available options.
+Inside Pi, use `/login` and `/model`. Model APIs must already be running and
+reachable; this project does not manage model servers.
+
+Without `--image` or `PI_DOCKER_IMAGE`, the launcher prefers local
+`pi-docker:custom`, otherwise `pi-docker:base`. See [usage](docs/USAGE.md#launching)
+for image-selection options. Base includes Pi, Node.js, and
+Herdr/GitHub tooling; custom adds Python, uv, nano, and optional extensions.
+See [image customization](docs/CUSTOMIZATION.md#two-images).
+
+**Security:** This is not a hardened sandbox. Containers can write the project
+and read mounted credentials; networking is shared with the host. Eligible
+launches inside Herdr automatically gain control of the whole connected session.
+Use `--no-herdr` to disable integration. Read [setup and security](docs/SETUP.md).
 
 ## Guides
 
-- [Everyday usage and sessions](setup/README.md)
-- [Herdr integration and diagnostics](setup/docs/HERDR_INTEGRATION.md)
-- [Provider login and GitHub authentication](setup/docs/AUTHENTICATION.md)
-- [Extensions, configuration, and maintenance](setup/docs/CUSTOMIZATION.md)
-- [Container agent instructions](setup/AGENTS.md)
+- [Setup](docs/SETUP.md): requirements, installation, mounts, security, migration.
+- [Usage](docs/USAGE.md): launcher options and conversations.
+- [Authentication](docs/AUTHENTICATION.md): providers and GitHub credentials.
+- [Herdr](docs/HERDR_INTEGRATION.md): helpers, restore, diagnostics.
+- [Customization](docs/CUSTOMIZATION.md): images, resources, updates.
+- [Container instructions](docs/AGENTS.md): compact agent orientation.
 
-## Repository layout
+Guide commands run on the host from this repository root unless marked otherwise.
 
-- **`setup/`** — non-secret deployment source; mounted read-only at
-  `/opt/pi-docker` inside Pi. Dockerfile and Compose files are at its root;
-  `bin/` holds commands, `lib/` launcher internals, `docs/` detailed guides,
-  and `extensions/` and `skills/` agent resources. Start at
-  [`setup/AGENTS.md`](setup/AGENTS.md) for the agent guide index.
-- **`tests/`** — automated checks; run with
-  `python3 -m unittest discover -s tests -p 'test_*.py'`.
-- **`data/`** — private configuration, credentials, sessions, and provider settings;
-  ignored by Git. Never put secrets under `setup/`.
+## Repository and tests
 
-Containers share configuration and credentials; use separate Git worktrees for
-concurrent writing agents. See [security and concurrency](setup/docs/SETUP.md#security-and-concurrency).
+Host tooling lives in `bin/` and `lib/`, build recipes in `images/`, and shared
+resources in `extensions/` and `skills/`. Builds use only `images/`; containers
+mount allowlisted deployment paths at `/opt/pi-docker`, not the repository root.
+Private state lives in ignored `data/`: **back it up privately; never publish it.**
 
-Run host commands in the guides from this repository root unless stated otherwise.
+Run offline checks with Python 3 and Node.js; no live Docker or Herdr is needed:
+
+```bash
+python3 -m unittest discover -s tests -p 'test_*.py'
+```
+
+Adapter tests skip without Node.js. Neither runtime is needed on the host to launch Pi.

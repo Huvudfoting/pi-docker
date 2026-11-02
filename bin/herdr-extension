@@ -2,15 +2,14 @@
 # Host-side preparation of the official Herdr Pi reporter.
 set -euo pipefail
 script="$(realpath -- "${BASH_SOURCE[0]}")"
-setup="$(dirname -- "$(dirname -- "$script")")"
-root="$(dirname -- "$setup")"
+root="$(dirname -- "$(dirname -- "$script")")"
 config="$root/data/config"
 extension="$config/extensions/herdr-agent-state.ts"
-source "$setup/lib/herdr-extension.sh"
+source "$root/lib/herdr-extension.sh"
 
 usage() {
-  printf '%s\n' 'Usage: setup/bin/herdr-extension [install|uninstall|ensure]
-       setup/bin/herdr-extension --help
+  printf '%s\n' 'Usage: bin/herdr-extension [install|uninstall|ensure]
+       bin/herdr-extension --help
 
 Run on the host, from any working directory (symlinks are supported).
 With no argument, install/update the official Herdr Pi reporter.

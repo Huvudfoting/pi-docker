@@ -1,0 +1,7 @@
+#!/bin/sh
+# PI_SELF_UPDATE_COMMAND: Pi itself is owned by the image, not this container.
+printf '%s\n' \
+  'Pi is image-managed; in-container self-updates are disabled.' \
+  'On the host, update PI_VERSION in images/base/Dockerfile, then run ./bin/build.' \
+  'If using custom, also run ./bin/build custom; start a new container.' >&2
+exit 1

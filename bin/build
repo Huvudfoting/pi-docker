@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root="$(dirname -- "$(dirname -- "$(realpath -- "${BASH_SOURCE[0]}")")")"
+context="$root/images"
+
+variant=base
+case "${1:-}" in
+  base|custom) variant="$1"; shift ;;
+  --help|-h)
+    printf '%s\n' 'Usage: bin/build [base|custom] [DOCKER_BUILD_OPTIONS...]
+Default: base (pi-docker:base). Custom: pi-docker:custom, derived from base.
+Build base first. PI_DOCKER_BASE_IMAGE selects another locally available base.
+Use --pull for base, not for a locally derived custom image.
+Extra Docker options (e.g. --no-cache, --tag my-pi:latest) are forwarded.
+Pi/Herdr versions are pinned in images/base/Dockerfile.
+The wrapper owns BASE_IMAGE for custom builds.'
+    exit 0 ;;
+  ""|-*) ;;
+  *) printf 'Unknown image variant: %s (choose base or custom)\n' "$1" >&2; exit 2 ;;
+esac
+
+if [[ "$variant" == custom ]]; then
+  for arg in "$@"; do
+    case "$arg" in
+      --pull|--pull=*)
+        printf '%s\n' 'Custom builds use a local base; pull source images explicitly instead of passing --pull.' >&2
+        exit 2 ;;
+    esac
+  done
+  base_image="${PI_DOCKER_BASE_IMAGE:-pi-docker:base}"
+  [[ "$base_image" =~ ^[a-zA-Z0-9][a-zA-Z0-9._/:@-]*$ ]] \
+    || { printf 'Invalid base image reference: %s\n' "$base_image" >&2; exit 2; }
+  if ! docker image inspect "$base_image" >/dev/null 2>&1; then
+    printf 'Cannot inspect local base %s. Check Docker access; build base first with ./bin/build, or build/pull your custom base explicitly.\n' "$base_image" >&2
+    exit 1
+  fi
+  printf 'Building custom image from local base %s.\n' "$base_image"
+  exec docker build "$@" --build-arg "BASE_IMAGE=$base_image" --file "$context/custom/Dockerfile" \
+    --tag pi-docker:custom "$context"
+fi
+
+printf 'Building base image (versions pinned in images/base/Dockerfile).\n'
+exec docker build "$@" --file "$context/base/Dockerfile" \
+  --tag pi-docker:base "$context"
