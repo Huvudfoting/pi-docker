@@ -18,8 +18,14 @@ For OpenAI/provider login and GitHub credentials, see
 - Docker Engine on Linux and the Compose plugin. Docker Desktop requires
   host networking support to be enabled (version 4.34 or later).
 - Bash, GNU `realpath`, and `sha256sum` for the launchers.
-- Optional Herdr integration: host Herdr and `flock` (util-linux).
-- A host `~/.gitconfig` file (mounted read-only for Git identity and settings).
+- A reachable model API and any required provider authentication for agent use.
+- Optional Herdr integration: host Herdr and `flock` (util-linux). Images always
+  include the container CLI and skill; host Herdr is needed only for integration.
+- Optional host `~/.gitconfig`: mounted read-only when it exists and is readable.
+  Use `--no-host-gitconfig` to skip it. Git itself is included in the image;
+  host Git, Pi, Node.js, and Python are not required to launch.
+
+Python 3 is needed on the host only to run the repository's automated tests.
 
 ## Directory layout and persistence
 
@@ -31,7 +37,7 @@ For OpenAI/provider login and GitHub credentials, see
 | `data/sessions/<name>-<path-hash>/` | `/pi/sessions` (Herdr: `/pi/herdr-sessions/<key>`) | Writable session storage selected by the launcher |
 | `data/herdr-launches/` | Not separately mounted | Private workspace/storage records for optional Herdr restore |
 | Selected project | `/workspace` | Writable project files |
-| `~/.gitconfig` | `/home/node/.gitconfig` | Read-only Git settings |
+| `~/.gitconfig` (if readable and enabled) | `/home/node/.gitconfig` | Optional read-only Git settings |
 
 `data/` is ignored by Git. Keep credentials, sessions, and real environment files
 there, never under `setup/`. The Pi image build context is `setup/`, with a
@@ -65,6 +71,11 @@ chmod +x setup/bin/pi
 ./setup/bin/build
 ```
 
+Every image includes the Herdr CLI and skill, without needing Herdr on the host
+to build or run standalone Pi. Integration is selected only at launch time;
+use `--no-herdr` to disable it. Builds replace `pi-agent:latest`; existing
+containers are unaffected.
+
 The launcher checks for this image and prints the build command if it is missing.
 After building, follow [AUTHENTICATION.md](AUTHENTICATION.md) for OpenAI/provider
 login, model configuration, and optional GitHub CLI credentials.
@@ -89,8 +100,8 @@ current workspace. `pi --help` shows launcher usage without requiring Docker;
 
 ### Optional Herdr integration
 
-Install Herdr on the host, then launch `pi /absolute/path/to/project` inside a
-Herdr pane. Eligible interactive launches automatically install/update its
+Build the image with `./setup/bin/build` and install Herdr on the host,
+then launch `pi /absolute/path/to/project` inside a Herdr pane. Eligible interactive launches automatically install/update its
 official Pi reporter in this deployment's shared configuration and enable support.
 To install/update the reporter explicitly instead:
 
@@ -114,8 +125,11 @@ updates/removal, restore, diagnostics, and socket security.
   Do not put private files in `setup/`, even if Git ignores them.
 - Choosing the repository root as `/workspace` exposes `data/` through that
   writable project mount. For setup-only inspection, choose `setup/` instead.
-- The host's `.gitconfig` is readable, including any sensitive values stored in
-  it. Host-only include paths or credential helpers may not work in the container.
+- When mounted, the host's `.gitconfig` is readable, including any sensitive
+  values stored in it. Use `--no-host-gitconfig` to omit it. Host-only include
+  paths or credential helpers may not work in the container. Missing host
+  configuration does not prevent launch; configure a project-local Git identity
+  if needed for commits.
 - For credential persistence, OAuth refresh concurrency, and token rotation, see
   [AUTHENTICATION.md](AUTHENTICATION.md).
 - Containers and session directories do not isolate simultaneous edits to the

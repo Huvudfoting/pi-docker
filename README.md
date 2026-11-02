@@ -5,7 +5,8 @@ and sessions. Use configured cloud providers or local models available at a
 host-accessible API URL. Setting up and managing model servers is outside this
 project's scope.
 
-Inside Herdr, eligible interactive launches enable agent reporting, conversation
+Images always include Herdr support, but using it is optional. Inside Herdr,
+eligible interactive launches enable agent reporting, conversation
 restore and a focused skill for sibling helpers and peer requests. Use
 `--no-herdr` to disable integration or `--herdr` to require it. See the
 [Herdr guide](setup/docs/HERDR_INTEGRATION.md) for usage and session-wide socket access.

@@ -41,6 +41,17 @@ class BuildPiDockerTest(unittest.TestCase):
                     self.assertEqual(skill.read_text(), text)
                     self.assertEqual(skill.stat().st_mode & 0o777, 0o644)
 
+    def test_image_requires_herdr_version(self):
+        dockerfile = (SOURCE / 'setup/Dockerfile').read_text()
+        block = next(block for block in dockerfile.split('\n\n')
+                     if 'herdr --skill >' in block)
+        command = block[block.index('RUN ') + 4:].replace('\\\n', '')
+        # Without the pinned version the build must fail before downloading.
+        result = subprocess.run(['/bin/sh', '-c', command], capture_output=True,
+                                text=True, env={'PATH': '/nonexistent'}, timeout=10)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('HERDR_VERSION', result.stderr)
+
     def test_pins_context_argument_boundaries_and_exit_status(self):
         with tempfile.TemporaryDirectory(prefix="pi build ") as temporary:
             root = Path(temporary)

@@ -1,0 +1,9 @@
+services:
+  pi:
+    volumes:
+      - type: bind
+        source: ${PI_GITCONFIG:?}
+        target: /home/node/.gitconfig
+        read_only: true
+        bind:
+          create_host_path: false

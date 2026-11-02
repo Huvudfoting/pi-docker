@@ -12,12 +12,13 @@ fail() { printf 'pi-docker: %s\n' "$*" >&2; exit 2; }
 source "$setup/lib/herdr-launch.sh"
 
 show_help() {
-  printf '%s\n' 'Usage: pi [workspace] [--name NAME] [--herdr|--no-herdr] [-- PI_ARGS...]
+  printf '%s\n' 'Usage: pi [workspace] [--name NAME] [--no-host-gitconfig] [--herdr|--no-herdr] [-- PI_ARGS...]
        pi [workspace] [--name NAME] --herdr-status
        pi --session <managed-session-path>  (native Herdr restore)
 
 Docker-Pi launcher options (before Pi arguments):
   --name NAME       Select session storage, not the conversation title.
+  --no-host-gitconfig  Do not mount the host ~/.gitconfig.
   --herdr           Require Herdr reporting and native restore (local Linux).
   --no-herdr        Disable detection, installation, and Herdr socket exposure.
   --herdr-status    Read-only local diagnostics; no Docker/Herdr API calls.
@@ -64,6 +65,7 @@ parse_arguments() {
         [[ "$herdr_mode" == auto ]] || fail "Choose only one of --herdr and --no-herdr"
         if [[ "$1" == --herdr ]]; then herdr_mode=required; else herdr_mode=disabled; fi
         shift ;;
+      --no-host-gitconfig) host_gitconfig=0; shift ;;
       --herdr-status) diagnose=1; shift ;;
       --help|-h) show_help; exit 0 ;;
       --) shift; break ;;
@@ -140,6 +142,7 @@ main() {
   herdr=0
   herdr_mode=auto
   diagnose=0
+  host_gitconfig=1
   restore_ref=""
   restore_filename=""
   pi_args=()
@@ -157,6 +160,10 @@ main() {
   require_docker
   PI_SESSION_TARGET=/pi/sessions
   compose_files=(-f "$setup/compose.yaml")
+  if ((host_gitconfig)) && [[ -f "$HOME/.gitconfig" && -r "$HOME/.gitconfig" ]]; then
+    export PI_GITCONFIG="$HOME/.gitconfig"
+    compose_files+=(-f "$setup/compose.git.yaml")
+  fi
   herdr_select_mode "${pi_args[@]}"
   if ((herdr)); then
     herdr_validate_context

@@ -5,8 +5,18 @@ helpers and peer requests. It uses the official Herdr CLI, skill and Pi reporter
 
 ## Scope and installation
 
-Requires **local Linux Docker Engine**, a trusted same-user Herdr session, and
-this deployment's [host launcher on PATH](SETUP.md#2-install-the-host-launcher-symlink).
+Herdr use is optional. Every build includes its CLI and skill, regardless
+of whether Herdr is installed on the host:
+
+```bash
+./setup/bin/build
+```
+
+Integration is selected only at launch time. Use `--no-herdr` to disable it;
+there are no Herdr-specific build flags.
+
+Integration requires **local Linux Docker Engine**, host Herdr and `flock`, a
+trusted same-user Herdr session, and this deployment's [host launcher on PATH](SETUP.md#2-install-the-host-launcher-symlink).
 New pane shells must resolve `pi` to that launcher, not a host-native Pi install.
 The mounted socket controls the **entire connected session**; the pane ID is not
 an access restriction. Docker Desktop, remote Docker and Windows are unsupported.
@@ -88,13 +98,16 @@ Host launch preparation manages only the official reporter under a lock in
 Shared skills are not installed, updated or removed by host preparation.
 
 Uninstall retains credentials, sessions and launch records; use `--no-herdr` to
-prevent preparation and explicit skill loading on the next launch. Start a new Pi
+prevent preparation and explicit skill loading on the next launch. An installed
+reporter can remain in shared configuration: it is inert without Herdr environment
+and socket context, which standalone launches do not forward. Start a new Pi
 process after reporter changes; `/reload` refreshes discovered skills. The
 Docker-Pi adapter remains deployment-owned under `setup/skills/pi-docker-herdr/`.
 
 The image pins Pi and the container Herdr CLI in `setup/bin/build`.
-Rebuild and start new containers to update them. Host Herdr is managed separately;
-the launcher neither synchronizes versions nor upgrades or restarts the server.
+Rebuild with `./setup/bin/build` and start new containers to update them.
+Host Herdr is managed separately; the launcher neither synchronizes versions nor
+upgrades or restarts the server.
 If the bound socket is replaced, start a fresh integrated container.
 
 ```bash

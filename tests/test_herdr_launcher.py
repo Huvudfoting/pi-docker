@@ -43,7 +43,7 @@ class HerdrLauncherTest(unittest.TestCase):
             "with open(os.environ['DOCKER_PROBE_LOG'], 'a') as f: f.write('called\\n')\n"
             "if sys.argv[1:3] == ['image', 'inspect']: sys.exit(0)\n"
             "keys = ['PI_WORKSPACE', 'PI_SESSIONS', 'PI_SESSION_TARGET', "
-            "'HERDR_ENV', 'HERDR_PANE_ID', 'HERDR_SOCKET_HOST_PATH', 'HERDR_AGENT']\n"
+            "'HERDR_ENV', 'HERDR_PANE_ID', 'HERDR_SOCKET_HOST_PATH', 'HERDR_AGENT', 'PI_GITCONFIG']\n"
             "with open(os.environ['DOCKER_LOG'], 'w') as f:\n"
             "    json.dump({'args': sys.argv[1:], 'env': {k: os.environ.get(k) for k in keys}}, f)\n"
             "sys.exit(int(os.environ.get('DOCKER_EXIT', '0')))\n"
@@ -146,6 +146,64 @@ class HerdrLauncherTest(unittest.TestCase):
         self.assertEqual(invocation["args"][:3], [
             "compose", "-f", str(self.setup / "compose.yaml"),
         ])
+
+    def test_gitconfig_is_optional_read_only_and_can_be_disabled(self):
+        config = self.root / '.gitconfig'
+        result, invocation = self.launch(self.other, '--no-herdr')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn(str(self.setup / 'compose.git.yaml'), invocation['args'])
+        self.assertFalse(config.exists())
+        config.write_text('[user]\nname = Test\n')
+        result, invocation = self.launch(self.other, '--no-herdr')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(str(self.setup / 'compose.git.yaml'), invocation['args'])
+        self.assertEqual(invocation['env']['PI_GITCONFIG'], str(config))
+        overlay = (self.setup / 'compose.git.yaml').read_text()
+        self.assertIn('read_only: true', overlay)
+        self.assertIn('create_host_path: false', overlay)
+        result, invocation = self.launch(self.other, '--no-herdr', '--no-host-gitconfig')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn(str(self.setup / 'compose.git.yaml'), invocation['args'])
+
+    def test_gitconfig_directory_is_not_mounted(self):
+        (self.root / '.gitconfig').mkdir()
+        result, invocation = self.launch(self.other, '--no-herdr')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn(str(self.setup / 'compose.git.yaml'), invocation['args'])
+
+    def test_gitconfig_and_herdr_overlays_work_together(self):
+        (self.root / '.gitconfig').write_text('[user]\nname = Test\n')
+        result, invocation = self.launch(self.other, '--herdr')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(invocation['args'][:7], [
+            'compose', '-f', str(self.setup / 'compose.yaml'),
+            '-f', str(self.setup / 'compose.git.yaml'),
+            '-f', str(self.setup / 'compose.herdr.yaml'),
+        ])
+
+    def test_standalone_needs_no_host_herdr(self):
+        (self.bin / 'herdr').unlink()
+        env = {key: value for key, value in self.env.items() if not key.startswith('HERDR_')}
+        result, invocation = self.launch(self.other, env=env)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn(str(self.setup / 'compose.herdr.yaml'), invocation['args'])
+        self.assertNotIn('--skill', invocation['args'])
+        self.assertIsNone(invocation['env']['HERDR_SOCKET_HOST_PATH'])
+        self.assertFalse((self.root / 'data/herdr-launches').exists())
+        self.assertEqual(self.herdr_calls(), [])
+        # The installed reporter fixture remains in shared configuration, but
+        # standalone Compose must not forward the context that activates it.
+        self.assertNotIn('HERDR_', (self.setup / 'compose.yaml').read_text())
+
+    def test_disabled_herdr_needs_no_host_herdr(self):
+        (self.bin / 'herdr').unlink()
+        result, invocation = self.launch(self.other, '--no-herdr')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn(str(self.setup / 'compose.herdr.yaml'), invocation['args'])
+        self.assertNotIn('--skill', invocation['args'])
+        self.assertIsNone(invocation['env']['HERDR_SOCKET_HOST_PATH'])
+        self.assertFalse((self.root / 'data/herdr-launches').exists())
+        self.assertEqual(self.herdr_calls(), [])
 
     def test_help_and_status_are_read_only_without_docker_calls(self):
         private = self.root / "data/config/auth.json"

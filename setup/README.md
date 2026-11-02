@@ -35,7 +35,7 @@ After [initial setup](docs/SETUP.md), build the image on the host from this
 deployment's repository root:
 
 ```bash
-./setup/bin/build
+./setup/bin/build  # Always includes Herdr CLI and skill
 ```
 
 Run these commands on the host after installing the launcher. If the image is
@@ -50,13 +50,14 @@ missing, `pi` prints the build command and repository directory to use.
 | `pi --help` | Show launcher usage without Docker |
 | `pi -- --help` | Show Pi's own help (not launcher help) |
 | `pi -- --version` | Show Pi's version through Docker using the current workspace |
+| `pi --no-host-gitconfig` | Launch without mounting the host Git configuration |
 | `pi --no-herdr` | Launch without Herdr preparation or socket access |
 | `pi --herdr` | Require Herdr support; fail if preparation fails |
 | `pi --herdr-status` | Read-only local Herdr diagnostics without Docker or installation |
 
 Put an explicit workspace first, then launcher options (`--name`, `--herdr`,
-`--no-herdr`, or `--herdr-status`), before Pi arguments. Use `--` to pass remaining
-arguments directly to Pi.
+`--no-herdr`, `--no-host-gitconfig`, or `--herdr-status`), before Pi arguments.
+Use `--` to pass remaining arguments directly to Pi.
 
 ## Sessions and parallel work
 
@@ -68,17 +69,19 @@ to resume a conversation. `--name` selects storage, not a conversation title.
 Multiple terminals can run separate containers. Identical workspace/name
 selections share session storage; use different names for separate storage.
 All containers share `data/config/` for settings, models, resources, and
-authentication, plus the host's read-only `.gitconfig` and read-only
-`data/gh-config/` GitHub CLI configuration.
+authentication, plus read-only `data/gh-config/` GitHub CLI configuration.
+The host's `.gitconfig` is mounted read-only only when readable, unless
+`--no-host-gitconfig` is supplied. Its absence does not prevent launch.
 
 Use separate Git worktrees for concurrent writing agents. See
 [security and concurrency](docs/SETUP.md#security-and-concurrency) for shared-state risks.
 
 ## Herdr
 
-Eligible interactive launches inside a local Linux Herdr pane automatically
-enable reporting/native restore and install/update the official integration when
-needed. Enabled launches print a notice: the socket grants control of the entire
+Every image includes Herdr support. Host Herdr is needed only for integration,
+not standalone use. Eligible interactive launches inside a local Linux Herdr pane
+automatically enable reporting/native restore and install/update the official
+integration when needed. Enabled launches print a notice: the socket grants control of the entire
 connected Herdr session, including other panes. Use only with trusted containers.
 
 Use `--no-herdr` to disable preparation and socket access, or `--herdr` to require

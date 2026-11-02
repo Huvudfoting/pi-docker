@@ -29,7 +29,8 @@ automatic Python downloads; use the image-provided interpreter.
 ### Herdr-managed exception
 
 Host Herdr manages the official reporter; the image owns the container CLI and
-operating skill. Do not vendor or modify upstream resources. See
+operating skill. Every image includes both; integration is optional at launch.
+Do not vendor or modify upstream resources. See
 [Herdr maintenance](HERDR_INTEGRATION.md#maintenance-and-diagnostics) for resource
 paths, loading, updates, and removal. Use `--no-herdr` to skip preparation and
 socket exposure.
@@ -82,12 +83,12 @@ than adding a background supervisor or a second lifecycle reporter.
 
 ## Updating image-managed packages
 
-Pi and Herdr are pinned in `setup/bin/build` (currently Pi 1.4.0 and Herdr
-0.9.5). Update those pins deliberately. Host/server/container mismatches are
-accepted; there is no runtime alignment gate. The script
-passes them as build arguments; direct Docker builds must supply both
-`PI_VERSION` and `HERDR_VERSION`. Pinning the image does not update or check host
-Herdr or an already-running server.
+Pi and Herdr are pinned in `setup/bin/build` (currently Pi 1.4.0 and
+Herdr 0.9.5). Update those pins deliberately. Host/server/container version
+mismatches are accepted; there is no runtime version alignment gate. Direct
+Docker builds must supply both `PI_VERSION` and `HERDR_VERSION`.
+Herdr is always included in the image; only launch-time integration is optional.
+Pinning the image does not update or check host Herdr or an already-running server.
 
 Python/uv image tags and extension npm `@latest` still track current releases.
 To refresh those dependencies, bypass build caches:

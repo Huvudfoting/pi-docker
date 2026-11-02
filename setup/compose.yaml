@@ -17,7 +17,6 @@ services:
       - ${PI_CONFIG:?}:/pi/agent
       - ${PI_SESSIONS:?}:${PI_SESSION_TARGET:-/pi/sessions}
       - ${PI_WORKSPACE:?}:/workspace
-      - ${HOME}/.gitconfig:/home/node/.gitconfig:ro
       - type: bind
         source: ${GH_CONFIG:?}
         target: /run/gh-config
