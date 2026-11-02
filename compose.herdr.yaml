@@ -1,0 +1,16 @@
+# Enabled by auto detection or --herdr; bin/pi validates host context.
+# Session target interpolation in compose.yaml gives restore a stable namespace.
+services:
+  pi:
+    environment:
+      HERDR_ENV: "1"
+      HERDR_PANE_ID: "${HERDR_PANE_ID:?}"
+      HERDR_SOCKET_PATH: /run/herdr/herdr.sock
+      # Host project root selected by the launcher, not container $PWD.
+      PI_DOCKER_HOST_WORKSPACE: "${PI_WORKSPACE:?}"
+    volumes:
+      - type: bind
+        source: "${HERDR_SOCKET_HOST_PATH:?}"
+        target: /run/herdr/herdr.sock
+        bind:
+          create_host_path: false

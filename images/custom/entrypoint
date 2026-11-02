@@ -1,0 +1,10 @@
+#!/bin/sh
+# Keep optional loading with the image that actually installs these resources.
+exec pi \
+  --append-system-prompt /usr/local/share/pi-custom/AGENTS.md \
+  --extension /usr/local/lib/node_modules/pi-rewind-hook/index.ts \
+  --extension /usr/local/lib/node_modules/pi-web-access \
+  --extension /usr/local/lib/node_modules/pi-ask-user \
+  --extension /usr/local/lib/node_modules/@specode/pi-subscription-usage \
+  --skill /usr/local/share/pi-custom/skills \
+  "$@"

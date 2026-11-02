@@ -1,0 +1,14 @@
+# Only image recipes and explicitly safe custom resources enter the context.
+# Private data/, configuration, and repository metadata are outside images/.
+**
+!.dockerignore
+!base/
+!base/Dockerfile
+!base/pi-update-guard
+!custom/
+!custom/Dockerfile
+!custom/entrypoint
+!custom/AGENTS.md
+!custom/skills/
+!custom/skills/python-development/
+!custom/skills/python-development/SKILL.md
