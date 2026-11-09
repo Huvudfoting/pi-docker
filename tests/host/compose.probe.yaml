@@ -1,0 +1,45 @@
+# Standalone experimental contract; does not load deployment Compose or .env.
+services:
+  probe:
+    image: "${PROBE_IMAGE_ID:?}"
+    pull_policy: never
+    entrypoint: [node, /probe/container-probe.js]
+    user: "${PROBE_UID:?}:${PROBE_GID:?}"
+    working_dir: "${PROBE_WORKDIR:?}"
+    read_only: true
+    network_mode: none
+    mem_limit: 512m
+    pids_limit: 128
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=16m,mode=1777
+    environment:
+      HOME: /tmp
+      GIT_CONFIG_GLOBAL: /dev/null
+      GIT_CONFIG_NOSYSTEM: "1"
+      GIT_AUTHOR_NAME: Mount Fixture
+      GIT_AUTHOR_EMAIL: mount-fixture@example.invalid
+      GIT_COMMITTER_NAME: Mount Fixture
+      GIT_COMMITTER_EMAIL: mount-fixture@example.invalid
+      PROBE_KIND: "${PROBE_KIND:?}"
+      PROBE_TARGET: "${PROBE_TARGET:?}"
+      PROBE_WORKDIR: "${PROBE_WORKDIR:?}"
+      PROBE_COMMON: "${PROBE_COMMON:-}"
+      PROBE_METADATA: "${PROBE_METADATA:?}"
+      PROBE_ACTION: "${PROBE_ACTION:?}"
+      PROBE_MAIN_SENTINEL: "${PROBE_MAIN_SENTINEL:-}"
+      PROBE_BARRIER: "${PROBE_BARRIER:-}"
+      PROBE_PARTICIPANT: "${PROBE_PARTICIPANT:-}"
+    volumes:
+      - type: bind
+        source: "${PROBE_CODE:?}"
+        target: /probe
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: "${PROBE_CHECKOUT:?}"
+        target: "${PROBE_TARGET:?}"
+        bind:
+          create_host_path: false

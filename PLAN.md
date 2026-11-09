@@ -85,8 +85,23 @@ thin helper-start orchestration layer.
   subdirectories, symlinked selection paths, forward/common/reverse Git pointers,
   separate Git directories, and a worktree nested beneath the main checkout.
   Linked Git operations worked with the main checkout's tracked source file
-  absent. These checks do not establish Docker mount correctness and must become
-  durable automated coverage.
+  absent. Repeatable discovery coverage now lives in `tests/host/`.
+- The host-run standalone suite passed **22 checks** using `pi-docker:custom`
+  (image ID `sha256:141109bdf9a1d146bec6b339d8bdf485b89a9549a8cd4849105f9182de169cb6`).
+  The reviewed report was supplied as `tests/host/report.txt`. Host versions were
+  Git 2.53.0, Bash 5.3.9, Compose 5.7.0, and Docker client/server 29.9.3; the image
+  supplied Node 24.22.2 and Git 2.39.5. Runtime checks passed for ordinary and
+  path-preserving mounts, Git operations, separate indexes, concurrent worktree
+  writes, subdirectory cwd, unusual paths, symlink selection, external/contained
+  metadata, missing-source refusal, and worktree survival after container exit.
+- The standalone prototype uses Bash/Git and static long-form Compose files,
+  without hand-built YAML or host Node. Its local discovery and fake-Docker
+  command tests also pass. An initial host run exposed terminal-input stopping
+  the timeout/Compose process group; batch commands now explicitly disable
+  interactivity/TTY and use `/dev/null` stdin, with regression coverage. The
+  completed host run validates that fix. This is evidence for the experimental
+  mount contract, not the production launcher/deployment Compose, Herdr lifecycle,
+  conversation/restore, rewind, or a separate base-image integration run.
 - The installed rewind hook is 1.8.8; its shared store ref and bounded update
   retries were inspected. Multi-worktree rewind/retention behavior remains to
   be tested against the actual image version.
@@ -135,22 +150,107 @@ and [worktree implementation](https://github.com/herdrdev/herdr/blob/v0.9.5/src/
 No further user policy decision is currently blocking Phase 1. Before advancing
 into production launcher changes:
 
-1. Prototype the Bash/Git discovery and safe Compose-selection approach in
-   disposable fixtures. Confirm it stays simple; otherwise report why and use
-   the agreed host-Node fallback rather than growing brittle shell machinery.
-2. Define the concrete reserved destination list, including deployment/runtime
-   resources, and test component-aware exact/ancestor/descendant comparisons.
-   Check symlink/literal-pointer reachability and deduplication of nested mounts.
+1. Review the now host-tested Bash/Git/static-Compose prototype for production
+   adoption. The Bash-first approach is viable so far; still report and use the
+   agreed host-Node fallback if deployment integration becomes brittle or complex.
+2. Review/finalize the prototype reserved destination list against all deployment
+   and runtime resources. Existing tests cover component-aware overlaps, literal
+   pointers, and metadata deduplication; verify coverage before treating the
+   prototype list as the final production policy.
 3. Check host Git and Compose capabilities needed by the implementation; inspect
    the host Herdr CLI version and verify host `pi` resolution when host access
    is available. Do not infer host executables from container installations.
-4. Obtain a Linux Docker host and an explicitly created disposable Herdr test
-   session for effective Compose/mount and create/open/remove integration checks.
-   Docker is unavailable in this agent container; local discovery/unit work can
-   proceed without that access, but host-only checks must remain marked pending.
-5. Record the resulting tested mount contract and convert exploratory Git checks
-   into repeatable tests. Do not mark Phase 1 complete from schema inspection or
-   local Git experiments alone.
+4. Construct and run create/open/remove contract checks in an explicitly created
+   disposable Herdr session. The user-run standalone Docker mount suite passed;
+   Docker remains unavailable inside the agent container, so further host checks
+   continue through constructed tests and returned reports. Production deployment
+   mount merging must be tested when launcher integration exists.
+5. Consolidate the tested mount contract after review and Herdr integration
+   evidence. Do not mark all of Phase 1 complete from the standalone Docker suite;
+   distinguish verified prototype behavior from still-pending production checks.
+
+## Next-session handoff
+
+### Immediate next step: construct the Herdr contract harness
+
+Continue Phase 1 by adding a **separate host-run Herdr contract harness** under
+`tests/host/`. Do not integrate the mount prototype into the production launcher
+or mark Phase 1 complete yet. Read this plan and `tests/host/README.md` first,
+then review `tests/host/report.txt` and the prototype code.
+
+The new harness should:
+
+1. Provide read-only preflight/version checks and exact user instructions for
+   running inside a real pane of an **explicitly created disposable Herdr
+   session**. Inspect host `pi` resolution without launching Pi. Never use the
+   user's existing work session for mutation tests, fabricate caller context,
+   upgrade/restart a server, or infer host paths from container `/workspace`.
+2. Create only disposable fixture repositories/resources and call the official
+   Herdr CLI. Verify create returns checkout/workspace/tab/root-pane records and
+   already opens/groups the workspace without a second open/split.
+3. Verify read-only parent-source discovery from a linked checkout, explicit
+   parent selection for create/open, focus preservation, existing-workspace
+   reuse/`already_open`, and detection of occupied returned panes. No agent
+   replacement or unrequested extra topology.
+4. Verify workspace close retains its checkout; verify dirty removal is refused
+   without force and explicit clean removal uses the exact open linked workspace
+   ID, removes that checkout/workspace, and retains the branch. All destructive
+   assertions must concern test-created resources only.
+5. Record identities immediately and emit per-step receipts, sanitized output,
+   and a final report suitable for the user to copy back into the shared checkout.
+   A timeout or partial failure stops mutation and reports known/uncertain state;
+   no retries, rollback, automatic cleanup, force, or branch deletion. Explicitly
+   requested removal assertions are test steps, not failure cleanup.
+
+The user can run tests constructed here on the host and return their reports.
+Docker is not available to the agent. Do not request Docker-socket exposure.
+Once the Herdr report is reviewed, finalize the reserved-path list and mount
+contract, then proceed to production mounting/restore changes in Phases 2–3.
+Production Compose merging still requires its own host test after implementation.
+
+### Durable evidence and local checks
+
+- `tests/host/report.txt`: reviewed **PASS (22 checks)** from the user's host;
+  fixture/report origin was `/tmp/pi-docker-mount.XFlrlif5/`. It validates the
+  standalone custom-image mount prototype, not production or Herdr behavior.
+- `tests/host/mount-contract.sh`: experimental Bash/Git discovery, ancestor scan,
+  reserved-path/pointer checks. `compose.probe.yaml` and `compose.metadata.yaml`
+  use static long-form binds; no host Node or generated YAML is needed so far.
+- `tests/host/container-command.sh`: batch execution with `-T`,
+  `--interactive=false`, stdin from `/dev/null`, and bounded local timeout. Keep
+  this fix: the first host attempt stopped timeout/Compose on terminal input.
+  Do not copy this batch-only behavior into interactive Pi launches unchanged.
+- Local checks passed: 30 discovery assertions, 8 fake-Docker preflight/batch
+  assertions, Bash/JavaScript syntax checks, and the existing 79 Python tests.
+  Re-run as appropriate after edits:
+
+  ```bash
+  bash tests/host/test-mount-contract.sh
+  bash tests/host/test-preflight.sh
+  bash -n tests/host/*.sh
+  node --check tests/host/container-probe.js
+  python3 -m unittest discover -s tests -p 'test_*.py'
+  git diff --check
+  ```
+
+  Node/Python above are development/test tools in the agent environment, not
+  new prerequisites for host launching or the host mount suite.
+
+### Working-tree and resource preservation
+
+The handoff changes, including `PLAN.md` and `tests/host/` with the supplied
+report, have been committed by the user. Resume from the checkout containing
+that commit. Keep transitional status/instructions in this plan and the
+harness-local documentation, not the durable root `README.md`. The production
+launcher, deployment Compose files, and container-side Herdr adapter are unchanged.
+
+No Herdr mutation harness has been implemented or run yet. No disposable Herdr
+session is available for reuse from this work. Temporary upstream-schema/source
+downloads from the exploratory session are not durable inputs; use the versioned
+references above if needed. Host test fixtures were deliberately retained; do
+not automatically delete them or assume a failed run's processes/resources have
+exited. The first attempt used `/tmp/pi-docker-mount.7BF9ROj9/`; inspect recorded
+state before any explicitly requested cleanup.
 
 ## Phase 1: Verify interfaces and define mount behavior
 
