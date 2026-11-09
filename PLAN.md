@@ -10,7 +10,23 @@ thin helper-start orchestration layer.
 ## Scope and principles
 
 - Support existing linked worktrees regardless of whether Herdr or Git created
-  them; do not depend on Herdr's checkout directory layout.
+  them; do not depend on Herdr's checkout directory layout. Also support external
+  Git metadata layouts such as `git init --separate-git-dir` through the same
+  discovery and mount-safety rules; reject layouts that cannot be represented
+  safely rather than treating them as self-contained checkouts.
+- Host Git is optional globally, but required whenever the selected directory
+  has an enclosing `.git` entry. Without Git, scan the selected directory and
+  all ancestors: allow ordinary-directory launches only if inspection succeeds
+  and no `.git` file, directory, or symlink (including a dangling one) is found.
+  Fail clearly on a marker or an inspection failure, without interpreting Git
+  metadata ourselves. Apply this policy with or without Herdr and on restore;
+  keep help and local diagnostics independent of Git availability.
+- Prefer small, readable Bash/Git host preparation with safe argument handling.
+  Do not require host Node.js initially. If this needs fragile parsing,
+  hand-built configuration, or excessive complexity, stop and report that
+  assessment before using the agreed fallback: Node.js on the host. No host
+  Python requirement or preliminary-container preparation workflow is planned.
+  Keep Herdr orchestration in the existing container-side Node adapter.
 - Do not introduce a Docker-Pi worktree registry, creation command, or cleanup
   manager.
 - Keep session storage names separate from workspace selection. `--name` must
@@ -26,8 +42,15 @@ thin helper-start orchestration layer.
   Do not ask users to choose an image, inherit the caller's image selection, or
   record an image for later replay. Conversation identity must not depend on
   which image is currently available.
-- Worktrees isolate working files, not security permissions, Git refs, host
-  ports, databases, credentials, or shared configuration.
+- Worktrees isolate working files and indexes, not security permissions, Git
+  refs, host ports, databases, credentials, or shared configuration. Shared
+  read/write access to repository metadata is accepted; do not build a Git
+  permissions-isolation system. Document: "Be aware: All agents working on the
+  same repository share read/write access to its Git metadata, including objects,
+  refs, and configuration, even when working in different worktrees."
+- Conversation discovery matches the exact canonical selected directory, not
+  every directory within a worktree. Mounting the whole checkout does not widen
+  conversation scope; preserve selected-directory/name-based storage.
 - Support `pi-rewind-hook` for recent-conversation rewind, allowing its
   configured retention policy to clean up snapshots. Do not disable retention
   or build a separate snapshot-retention manager. Snapshot availability is
@@ -43,6 +66,92 @@ thin helper-start orchestration layer.
   cleanup machinery. Restoring a conversation whose checkout was removed must
   fail clearly rather than recreate the checkout or start a replacement.
 
+## Discovery status and remaining prerequisites
+
+### Verified so far
+
+- The installed container CLI and running Herdr server report **0.9.5** with
+  compatible protocols; `images/base/Dockerfile` also pins 0.9.5. The host CLI
+  executable has not been separately checked. No live server was upgraded or
+  restarted, and no live worktree/workspace mutation tests were performed.
+- Installed command help/API schema, tagged upstream documentation/source, and
+  a live read-only worktree listing confirm the contract below. Response shapes
+  for mutations are schema/source-verified, not yet integration-tested here.
+- The launcher, Compose files, launch-record/restore implementation, helper,
+  and relevant tests have been inspected. Current code still uses `/workspace`
+  universally, propagates images, and supports image-aware/legacy records;
+  these are implementation changes to make, not completed work.
+- Disposable local Git checks passed for ordinary/linked checkouts, spaces,
+  subdirectories, symlinked selection paths, forward/common/reverse Git pointers,
+  separate Git directories, and a worktree nested beneath the main checkout.
+  Linked Git operations worked with the main checkout's tracked source file
+  absent. These checks do not establish Docker mount correctness and must become
+  durable automated coverage.
+- The installed rewind hook is 1.8.8; its shared store ref and bounded update
+  retries were inspected. Multi-worktree rewind/retention behavior remains to
+  be tested against the actual image version.
+
+### Confirmed Herdr 0.9.5 contract
+
+Evidence: installed `herdr --help`, `herdr worktree`, `herdr status`, and
+`herdr api schema --json`; the tagged upstream
+[CLI reference](https://github.com/herdrdev/herdr/blob/v0.9.5/docs/next/website/src/content/docs/cli-reference.mdx),
+[socket API documentation](https://github.com/herdrdev/herdr/blob/v0.9.5/docs/next/website/src/content/docs/socket-api.mdx),
+and [worktree implementation](https://github.com/herdrdev/herdr/blob/v0.9.5/src/app/api/worktrees.rs).
+
+- `worktree list` accepts `--workspace ID` or `--cwd PATH`, including a linked
+  checkout source. Its `.result.source` exposes `repo_root`,
+  `source_checkout_path`, and optional `source_workspace_id`; `.result.worktrees`
+  lists checkout paths and optional open workspace IDs.
+- `worktree create` accepts a parent source plus optional branch, base, path,
+  label, and focus choices. It creates the checkout **and opens/groups its
+  workspace** in one request. `.result` contains `workspace`, `tab`, `root_pane`,
+  and `worktree`; use `workspace.workspace_id`, `root_pane.pane_id`, and
+  `worktree.path`. Do not add a redundant open request or pane split.
+- `worktree open` accepts a parent source and exactly one of path or branch.
+  It returns those same records plus `already_open`. A returned pane may already
+  be occupied; inspect it before starting an agent, never replace an occupant.
+- Create/open reject linked-worktree sources (`linked_worktree_source`). For
+  callers in linked worktrees, discover the parent through Herdr's read-only
+  listing/provenance before invoking create/open. Never guess the parent path
+  or fall back to another client's focused workspace.
+- There is no separate opaque worktree ID or explicit reuse flag. Retain paths,
+  repository provenance, workspace/pane IDs, and agent identities as returned.
+  Existing local branches are checked out by create; otherwise Herdr creates a
+  branch from the supplied base or HEAD. An existing branch does not use base.
+  Existing-checkout reuse belongs to open; surface conflicts rather than retry.
+- `worktree remove --workspace ID` requires an open Herdr-managed linked-worktree
+  workspace. It returns `workspace_id`, `path`, and `forced`, removes the checkout,
+  closes its workspace on success, and retains the branch. Refuse to add force
+  when Herdr/Git rejects removal. `workspace close` only closes Herdr state;
+  closing a primary workspace with linked children requires explicit group intent.
+- Use explicit source/target identities and `--no-focus`. The host `pi` command
+  must resolve to this deployment's launcher. Herdr starts that command in its
+  returned pane; the launcher starts Docker. Container-side Node talks to Herdr
+  through inherited context/socket, not through Docker access.
+
+### What is still needed to complete Phase 1
+
+No further user policy decision is currently blocking Phase 1. Before advancing
+into production launcher changes:
+
+1. Prototype the Bash/Git discovery and safe Compose-selection approach in
+   disposable fixtures. Confirm it stays simple; otherwise report why and use
+   the agreed host-Node fallback rather than growing brittle shell machinery.
+2. Define the concrete reserved destination list, including deployment/runtime
+   resources, and test component-aware exact/ancestor/descendant comparisons.
+   Check symlink/literal-pointer reachability and deduplication of nested mounts.
+3. Check host Git and Compose capabilities needed by the implementation; inspect
+   the host Herdr CLI version and verify host `pi` resolution when host access
+   is available. Do not infer host executables from container installations.
+4. Obtain a Linux Docker host and an explicitly created disposable Herdr test
+   session for effective Compose/mount and create/open/remove integration checks.
+   Docker is unavailable in this agent container; local discovery/unit work can
+   proceed without that access, but host-only checks must remain marked pending.
+5. Record the resulting tested mount contract and convert exploratory Git checks
+   into repeatable tests. Do not mark Phase 1 complete from schema inspection or
+   local Git experiments alone.
+
 ## Phase 1: Verify interfaces and define mount behavior
 
 1. Check the supported host/server Herdr versions and the pinned container CLI.
@@ -51,33 +160,47 @@ thin helper-start orchestration layer.
    semantics. Do not guess JSON field names or upgrade/restart a live server.
 2. Inspect the existing launcher, Compose configuration, restore records, helper
    script, and tests before changing them.
-3. Define checkout discovery using Git on the host: checkout root, per-worktree
-   Git directory, and Git common directory. Resolve paths explicitly; do not
-   infer linked worktrees from directory names.
-4. Use path-preserving mounts for linked-worktree launches: mount the selected
-   checkout and Git common directory at their actual absolute host paths inside
-   the container, and set the working directory to the selected workspace.
-   Mount additional metadata paths only if discovery shows they are necessary.
+3. Define checkout discovery using Git on the host: selected directory, checkout
+   root, per-worktree Git directory, and Git common directory. Resolve paths
+   explicitly; do not infer linked worktrees from directory names. Include
+   separate-Git-directory layouts and the conservative no-Git ancestor scan
+   specified above. Recognized but invalid/inaccessible Git metadata must not
+   silently become a non-Git launch.
+4. Use path-preserving mounts when external Git metadata requires them: mount
+   the entire selected checkout and Git common directory read/write at their
+   actual absolute host paths inside the container. Do not mount the original
+   checkout's source files merely to expose its `.git` directory. Mount additional
+   metadata paths only if discovery shows they are necessary; the usual
+   per-worktree Git directory is already inside the common directory.
 5. Validate this design against Git's forward and reverse worktree pointers.
-   Resolve symlinks and validate exact, ancestor, and descendant mount overlaps
-   against reserved configuration, session, socket, and deployment targets
-   (including `/pi`, `/run`, and `/opt/pi-docker`). Reject unsafe layouts with
-   actionable errors rather than remapping paths, mounting broad host
-   directories, or rewriting Git metadata. Deduplicate or reject checkout/Git
-   metadata overlaps explicitly; do not rely on mount order.
-6. Keep the existing `/workspace` layout for ordinary launches. Decide and
-   document how an explicitly selected subdirectory of a linked worktree maps
-   to the mounted checkout while preserving that selected working directory.
+   Resolve symlinks and verify literal metadata pointers remain reachable.
+   Reserve known conflicting/unsafe container paths, not an allowlist of host
+   project prefixes. Reject component-aware exact, ancestor, and descendant
+   overlaps with configuration, session, socket, credentials, deployment, and
+   essential runtime paths (including `/pi`, `/run`, `/opt/pi-docker`, and runtime
+   trees such as `/usr`, `/bin`, and `/home/node`). Define the full list from the
+   image/layout contract. Reject unsafe layouts with actionable errors rather
+   than remapping paths, mounting broad host directories, or rewriting metadata.
+   Deduplicate metadata already reachable at the correct path within a required
+   mount; reject unsafe checkout/metadata overlaps. Do not rely on mount order.
+6. Keep the existing `/workspace` layout for ordinary directories and
+   self-contained checkouts. For a selected subdirectory of a linked/external-
+   metadata checkout, mount the whole checkout at its host path but start Pi in
+   the exact canonical selected subdirectory. Preserve selected-directory/name
+   storage and exact-directory conversation matching; do not aggregate history
+   from the checkout root, parents, children, or sibling subdirectories.
 
 Deliverable: a tested mount contract and confirmed Herdr API contract.
 
 ## Phase 2: Launch existing linked worktrees correctly
 
-1. Add host-side Git discovery and mount preparation to the launcher, preferably
-   in a small dedicated helper rather than expanding Herdr-specific code.
-   Do not add a host Python requirement or depend on custom-image tools;
-   preserve minimal-base support. Extend the existing Node-built-ins-only
-   adapter rather than introducing a parallel helper implementation.
+1. Add host-side discovery and mount preparation in a small dedicated Bash/Git
+   helper rather than expanding Herdr-specific code. Keep Git optional under
+   the conservative ancestor-scan policy. Keep host Node optional unless the
+   Bash prototype fails the simplicity/safety assessment; then report and use
+   the agreed Node-built-ins-only host fallback. Do not add host Python or
+   custom-image tool dependencies. Host mount preparation is distinct from
+   container-side Herdr orchestration; do not duplicate lifecycle policy.
 2. Make Compose working-directory and mount selection configurable. Use safe
    argument/structured configuration handling for paths; do not interpolate
    untrusted paths into shell commands or hand-built YAML. Replace the default
@@ -107,8 +230,10 @@ inside the container.
 
 ## Phase 3: Validate persistence and Herdr restore
 
-1. Retain the actual selected checkout path in the new launch records; avoid
-   duplicating Herdr's workspace grouping or worktree registry.
+1. Retain the exact canonical selected directory (including any selected
+   subdirectory) in the new launch records, not just the checkout root. Rediscover
+   the checkout root/metadata when needed; avoid duplicating Herdr's workspace
+   grouping or worktree registry.
 2. On restore, validate only what currently exists at the recorded path and
    rebuild the required mounts. Do not record a launch-type flag or historical
    checkout identity. A valid replacement checkout at the same path is accepted;
@@ -147,8 +272,11 @@ conversation reliably.
    shared-checkout and isolated-worktree modes. Keep shared sibling helpers as
    the default unless isolation is requested.
 2. For isolated helpers, call Herdr's worktree create/open interface with an
-   explicit source workspace or host checkout path. Preserve caller context;
-   never substitute container `/workspace` for a host path.
+   explicit parent source workspace or host checkout path. If the caller is in
+   a linked worktree, obtain the parent through Herdr list/provenance first.
+   Preserve caller context; never substitute container `/workspace` for a host
+   path. Create already opens/groups the workspace and supplies a root pane;
+   do not add a redundant open or sibling split.
 3. Delegate branch/base defaults, dirty-checkout handling, detached/unborn HEAD
    behavior, branch collisions, and existing-worktree reuse semantics to Herdr.
    Pass explicit user choices through its verified supported interface;
@@ -156,9 +284,13 @@ conversation reliably.
    or implement parallel Git creation/recovery policy. Surface Herdr's errors
    and required user decisions; never automatically force, stash, commit,
    transfer edits, reset, or switch an existing worktree.
-4. Use the workspace, checkout path, and available root pane returned/discovered
-   through Herdr, then start the host Docker-Pi launcher with `--kind pi` and the
-   selected workspace. The host `pi` command must resolve to this launcher.
+4. Use the workspace, checkout path, and root pane returned/discovered through
+   Herdr. Inspect availability, especially when open returns `already_open`;
+   never assume its root pane is an empty shell or replace an occupant. Start
+   the host Docker-Pi launcher through `agent start --kind pi` in an available
+   returned/discovered pane, passing the selected host directory. Stop and report
+   if no suitable pane is available rather than inventing extra topology. The
+   host `pi` command must resolve to this launcher.
 5. Preserve focus. Explain that Herdr-managed worktrees open as grouped
    workspaces rather than sibling panes; reject conflicting topology options
    clearly instead of silently ignoring them.
@@ -178,20 +310,25 @@ conversation reliably.
    before recovery. No automatic cleanup or branch deletion.
 9. Provide a skill-driven open/resume workflow for an existing worktree. Unless
    the user specifies a conversation, resume the most recently updated
-   conversation across all storage names for that exact worktree path; if none
-   exists, start a fresh conversation. Discover history independently of the
-   new helper's agent name and reuse the selected conversation's original
-   storage location. `--name` remains a storage selector, not a worktree selector.
+   conversation across all storage names for the exact canonical selected
+   directory; if none exists, start a fresh conversation. For a root selection,
+   exclude conversations launched in subdirectories; for a subdirectory selection,
+   exclude root, parent, child, and sibling-directory conversations. Discover
+   history independently of the new helper's agent name and reuse the selected
+   conversation's original storage location. `--name` remains a storage selector, not a worktree selector.
    Use best-effort discovery: accept Pi's behavior of skipping unusable history
    and starting fresh if no usable conversation is found, even when unreadable
    or invalid history exists. Do not add strict history validation machinery.
    An explicitly requested missing/unusable conversation or an invalid checkout
    must still fail clearly rather than silently select another conversation.
    Use the launcher's image-agnostic storage and automatic custom/base selection.
-10. For an explicit user request to remove a worktree, use Herdr's removal
-   interface after identifying the exact target and checking its documented
-   safety requirements. Report Herdr's result without adding forced removal,
-   branch deletion, or Docker-Pi conversation/launch-record cleanup. Do not
+10. For an explicit user request to remove a worktree, identify the exact target
+   and its open Herdr-managed linked-worktree workspace ID; removal takes that
+   ID, not a checkout path. If a closed target must be opened first, treat that
+   as an explicit receipted step under the requested removal workflow. Check
+   Herdr's documented safety requirements. Report its result without adding
+   forced removal, branch deletion, or Docker-Pi conversation/launch-record
+   cleanup. Do not
    retry an ambiguous removal automatically.
 
 Deliverable: the `pi-docker-herdr` skill orchestrates worktree create/open,
@@ -218,8 +355,16 @@ user workflow.
   is removed. Test clear rejection of unsupported old restore references;
   backward compatibility and migration of older conversations are not required.
 - Use real temporary Git repositories for checkout discovery and Git-pointer
-  tests, including regular checkouts, linked worktrees, subdirectories, spaces,
-  symlinks, and a main checkout outside the selected worktree directory.
+  tests, including regular checkouts, linked worktrees, separate Git directories,
+  subdirectories, spaces, symlinks, and a main checkout outside the selected
+  worktree directory. Cover nested worktrees, metadata deduplication, and literal
+  pointer paths that differ from canonical discovery paths.
+- Without host Git, test ordinary-directory launch/restore success and rejection
+  of `.git` files/directories/symlinks in any ancestor, including dangling markers
+  and inspection failures. Apply the same rules with and without Herdr. Verify
+  help/local diagnostics need no Git and the preferred path needs no host Node.
+- Test reserved destination equality/ancestor/descendant checks, runtime and
+  deployment collisions, and component boundaries (`/runaway` is not `/run`).
 - Test missing metadata, unsupported path collisions, and invalid restore paths.
   Verify restore accepts a valid checkout recreated at the recorded path and
   treats a surviving directory with no recognized Git metadata as ordinary,
@@ -242,14 +387,16 @@ user workflow.
   work, and unavailable rewind points must not be offered as successful restores.
   Do not silently edit shared user configuration or require indefinite snapshot
   preservation.
-- Test helper create/open success, forwarding supported explicit branch/base
-  and reuse choices, use of Herdr defaults, and clear propagation of Herdr
-  errors without parallel Git policy or forced recovery. Cover unavailable API
-  features, partial startup failures, ambiguous timeouts, and preservation of
-  returned identities.
+- Test helper create/open success, parent-source discovery from linked callers,
+  create's combined checkout/open behavior without redundant mutations, supported
+  branch/base options, and existing-checkout reuse through open (not an invented
+  reuse flag). Cover occupied already-open panes, Herdr defaults/errors, unavailable
+  API features, partial startup failures, ambiguous timeouts, and preservation of
+  returned identities without parallel Git policy or forced recovery.
 - Test open/resume selects the most recently updated conversation across all
-  storage names for the exact worktree when none is specified, including a
-  reopened helper whose agent name differs from the original. Verify reuse of
+  storage names for the exact selected directory when none is specified, including
+  a reopened helper whose agent name differs from the original. Assert that root,
+  parent, child, and sibling-directory history is not pooled. Verify reuse of
   the selected conversation's original storage location, explicit selection,
   and fresh start when no usable conversation is found. Cover best-effort
   fallback with unreadable/invalid history; explicit missing/unusable
@@ -270,8 +417,15 @@ Docker is unavailable inside the agent container. Run Docker integration checks
 on a Linux host with the deployment launcher and a compatible Herdr server.
 Use an explicitly created disposable test session, not the user's live work.
 
+- Verify host Herdr CLI/server versions and host `pi` launcher resolution. Exercise
+  create/open/remove in a disposable Herdr session, including linked-source parent
+  discovery, focus preservation, already-open occupied panes, and dirty-removal
+  refusal without force.
+- Validate effective merged Compose mounts, missing-source failure without source
+  creation, reserved-path rejection, and selected-subdirectory working directories.
 - In a linked-worktree container, verify `git status`, diff, add, commit, log,
-  and worktree listing with Git metadata paths accessible.
+  and worktree listing with Git metadata paths accessible. Verify separate-Git-dir
+  support and that the original checkout's source files need not be exposed.
 - Run two writing agents in separate worktrees; verify working files and indexes
   remain separate and both branches are visible for deliberate integration.
 - Verify ordinary launches and read-only/shared-checkout helper workflows.
@@ -298,12 +452,17 @@ image-owned agent instructions as applicable, and
 - Automatic custom-if-available/base-otherwise selection, with no image
   overrides, caller-image propagation, or recorded-image replay.
 - Image-independent conversation identity, no backward compatibility with older
-  formats, latest usable conversation across all names for the exact worktree,
-  and best-effort fallback to fresh when no usable conversation is found.
+  formats, latest usable conversation across all names for the exact canonical
+  selected directory (not the whole worktree), and best-effort fallback to fresh
+  when no usable conversation is found.
 - Partial-success receipts and explicit recovery after inspecting known state;
   no automatic recovery or cleanup.
 - Shared versus isolated helpers and their different topology.
-- Actual container working directories and required Git metadata mounts.
+- Actual container working directories, whole-checkout mounts for selected
+  subdirectories, required Git metadata mounts, and the reserved-path policy.
+- Optional host Git and conservative no-Git ancestor scanning; detected Git
+  markers require Git, regardless of Herdr mode. Bash/Git host preparation is
+  preferred; document a host Node prerequisite only if the agreed fallback is used.
 - Image-owned rewind support in custom and absence in base. Rewind is intended
   for recent conversations, and configured retention may clean up snapshots,
   including those referenced by other worktrees. Saved conversation history does
@@ -339,10 +498,16 @@ image-owned agent instructions as applicable, and
    partial failure, with no destructive cleanup or blind retries.
 7. The skill provides create/open/start/resume/remove workflows. Unqualified
    resume selects the latest usable conversation across all storage names for
-   the exact worktree, with best-effort fallback to a fresh conversation when
-   none is found. An explicit missing/unusable conversation or invalid checkout
-   fails clearly. Explicit removal delegates to Herdr and retains saved conversations
-   and launch records.
+   the exact canonical selected directory, without pooling history from other
+   directories in that worktree, with best-effort fallback to a fresh conversation
+   when none is found. An explicit missing/unusable conversation or invalid
+   checkout fails clearly. Explicit removal delegates to Herdr and retains saved
+   conversations and launch records.
+8. Host Git is not a universal launch prerequisite: non-Git directories may launch
+   without it only after a successful marker-free ancestor scan. Git-marked or
+   uninspectable selections fail clearly without Git, with or without Herdr and
+   on restore. Host preparation remains simple Bash/Git or uses the agreed,
+   explicitly reported host-Node fallback; neither path requires host Python.
 
 ## Recommended delivery order
 
@@ -352,5 +517,8 @@ skill-driven lifecycle orchestration (Phase 4). This ordering is an engineering
 sequence, not a reduction in scope: create/open/start/resume/remove automation
 is required to complete the plan, and manual commands are only a fallback.
 Phase 5 tests and documentation accompany each increment rather than waiting
-until the end. Subdirectory-launch semantics and actual supported Herdr behavior
-remain Phase 1 decisions based on verified interfaces.
+until the end. Subdirectory semantics, exact-directory history scope, shared Git
+permissions, reserved-path policy, optional host Git, and the Bash-first/Node-
+fallback approach are settled above. Phase 1 must turn the verified Herdr contract
+and exploratory Git checks into a tested mount contract, with host-only checks
+clearly tracked until a disposable Docker/Herdr environment is available.
