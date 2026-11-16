@@ -69,8 +69,8 @@ are disabled. Install persistent global tools in images, not running containers.
 Custom installs/loads `pi-rewind-hook`, `pi-web-access`, `pi-ask-user`, and
 `@specode/pi-subscription-usage`. `pi-ask-user` provides the `ask_user` tool and
 emits the managed `herdr:blocked` events while waiting for input.
-They are **not required by Herdr**. The example uses `@latest`; pin versions for
-reproducibility. See [usage-extension authentication](AUTHENTICATION.md#subscription-usage-extension).
+They are **not required by Herdr**.
+See [usage-extension authentication](AUTHENTICATION.md#subscription-usage-extension).
 Do not vendor upstream extensions into homemade folders or use runtime
 `pi install` for image-managed packages.
 
@@ -117,6 +117,9 @@ See [migration](SETUP.md#migrating-the-old-layout) for old paths and image tags.
 Update `PI_VERSION` and `HERDR_VERSION` in `images/base/Dockerfile`. Their pinned
 defaults also apply to direct Docker builds; `bin/build` only selects the recipe
 and tag. Host Herdr and its server are separate; no automatic alignment or restart.
+
+Extension versions may be pinned in `images/custom/Dockerfile`; update them
+there and rebuild, not in shared configuration.
 
 Base sets `PI_SELF_UPDATE_COMMAND` to an image-local guard, inherited by custom.
 When Pi would self-update, it refuses and prints host rebuild instructions with a

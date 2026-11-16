@@ -18,11 +18,12 @@ RUN apt-get update \
         liblzma5 libncursesw6 libreadline8 libsqlite3-0 libssl3 libuuid1 zlib1g \
     && rm -rf /var/lib/apt/lists/*
 
+# Pin reviewed extension releases; changing a version also invalidates this layer.
 RUN npm install -g \
-    pi-rewind-hook@latest \
-    pi-web-access@latest \
-    pi-ask-user@latest \
-    @specode/pi-subscription-usage@latest
+    pi-rewind-hook@1.8.8 \
+    pi-web-access@0.48.0 \
+    pi-ask-user@0.17.2 \
+    @specode/pi-subscription-usage@1.5.0
 
 # Image-owned resources do not pollute mounted/shared Pi configuration.
 COPY custom/entrypoint /usr/local/bin/pi-custom
