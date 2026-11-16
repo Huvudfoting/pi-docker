@@ -3,7 +3,9 @@
 This is an **experimental standalone harness**, not the production launcher.
 It tests a Bash/Git discovery helper and small static Compose files. It does not
 change `bin/pi`, load deployment Compose, or claim production-launcher coverage.
-No host Node.js, Python, or Herdr is required. Node runs only inside the image.
+The mount suite requires no host Node.js, Python, or Herdr. Node runs only inside
+the image. The **separate Herdr contract suite** below requires host Herdr and
+`jq`, but neither Docker nor host Node/Python.
 
 ## 1. Offline checks (also runnable inside the agent container)
 
@@ -53,6 +55,9 @@ bash tests/host/verify-worktree-mounts.sh --run
 
 The suite pins the image ID selected during preflight and creates a unique
 `/tmp/pi-docker-mount.XXXXXXXX/` directory. It runs fixed test code, not Pi.
+The container probe reads image-owned package metadata and requires Pi **1.5.2**;
+rebuild your base/custom images first. This catches a custom image still derived
+from the older base without launching Pi or loading extensions.
 Containers have:
 
 - Only test checkout/metadata binds and this test-code directory mounted.
@@ -80,14 +85,17 @@ it does not load the repository's `.env` or deployment configuration.
   metadata barrier before committing in distinct worktrees.
 - Deep subdirectory cwd, spaces/quotes/dollar/colon characters, canonical symlink
   selection, nested worktrees, and separate Git directories work.
+- A direct `.git` symlink to represented physical metadata works inside Docker.
 - Missing checkout/metadata bind sources fail without being created; errors must
   actually identify the missing source, not an unrelated operational failure.
 - Container exit leaves fixture worktrees intact.
 
 The reserved-path and malformed-pointer checks run offline before containers;
-the suite never mounts host runtime directories to test rejection. The reserved
-list is a prototype requiring review before production adoption. This is mount
-and index separation, **not a security boundary around shared Git metadata**.
+the suite never mounts host runtime directories to test rejection. The reviewed
+policy and remaining adoption gates are recorded in `MOUNT_CONTRACT.md`. Current
+checks include direct `.git` symlinks and refusal of pointer aliases whose
+canonical endpoints conceal unavailable intermediate paths. This is mount and
+index separation, **not a security boundary around shared Git metadata**.
 
 ### Results and ambiguous failures
 
@@ -125,11 +133,179 @@ confirming no recorded container remains running, you may explicitly delete the
 are self-contained disposable fixtures, not registrations in your real project.
 Do not use broad cleanup commands such as `docker system prune`.
 
+## 4. Separate disposable Herdr contract suite
+
+`verify-herdr-contract.sh` uses the official CLI to test Herdr lifecycle semantics,
+**without Docker or Pi startup**. Requirements: Linux, normal (non-root) user,
+Bash, Git 2.31+, `jq` 1.6+, GNU `realpath`/`timeout`, host `pi` resolving directly
+(or through a symlink) to this deployment's launcher, and reviewed Herdr
+CLI/server **0.9.5**. A different version fails closed: return its preflight
+output for review; do not upgrade/restart a server to make the harness pass.
+Use an uncomplicated interactive shell without long-running startup commands.
+
+### Create a genuinely separate session yourself
+
+From a **new host terminal outside your existing Herdr session**:
+
+```bash
+herdr --session "pi-docker-phase1-$(date +%Y%m%d-%H%M%S)"
+```
+
+This explicitly launches a disposable session. Inside its initial real shell
+pane, change to the actual **host checkout** containing these harness files:
+
+```bash
+cd /absolute/host/path/to/this-checkout
+type -a pi
+bash tests/host/verify-herdr-contract.sh --preflight --launcher "$PWD/bin/pi"
+```
+
+Inspect `type -a pi`: the command must resolve to this deployment, not an unrelated
+Pi installation or shell function. The script verifies the executable/symlink on
+PATH against the supplied absolute launcher path without executing it. If your
+launcher installation lives elsewhere, supply its actual path; never infer host
+paths from container `/workspace`. Preflight checks inherited `HERDR_ENV`, caller
+pane and socket, server version/protocol, and that only the initial workspace,
+tab and pane exist with no agents. It performs no mutation or file creation.
+Do not export fabricated caller/session/socket variables or retarget a server.
+
+After preflight passes, in that same disposable shell:
+
+```bash
+bash tests/host/verify-herdr-contract.sh --run --launcher "$PWD/bin/pi" \
+  --confirm-disposable-session
+```
+
+The confirmation flag attests that **you created this session for disposable
+tests**; one-pane topology alone cannot establish that. Never use your work
+session, even if it currently has just one pane. The harness does not launch,
+stop, upgrade, or restart any session/server, agent or Docker container.
+
+### Contract assertions
+
+The harness uses the tagged upstream [CLI reference](https://github.com/herdrdev/herdr/blob/v0.9.5/docs/next/website/src/content/docs/cli-reference.mdx),
+[response schema](https://github.com/herdrdev/herdr/blob/v0.9.5/src/api/schema/response.rs),
+[pane schema](https://github.com/herdrdev/herdr/blob/v0.9.5/src/api/schema/panes.rs),
+and [worktree implementation](https://github.com/herdrdev/herdr/tree/v0.9.5/src/app/api/worktrees).
+These are source-level evidence; only the returned host report establishes live
+behavior on your installation.
+
+- Create returns checkout/workspace/tab/root-pane identities, already opens the
+  checkout, and establishes common parent/child provenance without another split.
+- Read-only listing from a linked source discovers the parent; create/open from
+  that linked source fail with `linked_worktree_source`. Subsequent operations
+  select the returned parent explicitly, never a focused workspace fallback.
+- Open reuses an existing workspace/pane with `already_open`; close retains its
+  checkout; opening that closed checkout returns a new workspace.
+- Dirty removal returns `dirty_worktree_requires_force`, retains the edit and
+  open workspace, and is never retried with force. A separate planned assertion
+  restores only the fixture file we wrote, then explicitly removes the exact
+  clean linked workspace, verifies its checkout/workspace are gone and branch
+  retained. This is an intentional test step, not failure cleanup.
+- A bounded foreground fixture shell process occupies a second test-created
+  worktree pane. Inspection detects it; open returns the same occupied pane and
+  process group. No agent is started or replaced. Its release file is written
+  only on normal test completion; otherwise it exits itself after at most 60
+  one-second iterations (plus scheduling time).
+- Focus remains on the original workspace/tab/pane. No `--force`, repository
+  trust override, branch deletion, extra topology, or automatic cleanup.
+
+### Results and partial failure
+
+The unique `/tmp/pi-herdr-contract.XXXXXXXX/` directory is retained:
+
+- `report.txt`: sanitized per-step status/identity summaries and assertions.
+  **Review and return this file first**, under a distinct name such as
+  `tests/host/herdr-report.txt`; do not overwrite the existing Docker report.
+- `receipts.jsonl`: append-only stage events. Planned mutation stages begin as
+  `not_attempted`; a call appends `uncertain` **before** invoking the CLI and then
+  appends the observed outcome. Use the latest event for each stage/step. Returned
+  result identities are persisted before assertions, even after a CLI timeout
+  with a valid JSON response. Missing/malformed responses leave uncertainty.
+- `logs/`: private raw stdout/stderr for each CLI call; `fixtures/`: repositories.
+  Receipts and raw logs contain host paths and snapshot/process data; share only
+  after review if specifically needed. The report omits full snapshots, process
+  argv and terminal output, substitutes fixture/socket/launcher paths, and strips
+  terminal control bytes. Errors can still contain other host-specific details.
+
+Each test CLI call has a 20-second local timeout and five-second kill grace;
+preflight calls use 15 seconds. A timeout/cancellation stops the sequence, but
+may follow a successful remote mutation. **Do not blindly rerun or clean up.**
+Inspect the exact returned identities and raw logs first. No rollback, automatic
+retry, forced removal, or failure cleanup is attempted. On success, the parent
+and second linked checkout/workspace intentionally remain for inspection; any
+later cleanup must be explicitly requested and target only these fixture IDs.
+A leftover bounded fixture process must not be mistaken for a user agent.
+
+### Offline harness regression tests
+
+The repository's Python unittest suite includes `tests/test_herdr_contract.py`,
+which invokes a fake CLI (`fake-herdr.py`) against unique local fixture repos and
+a private dummy socket. It tests preflight, consent/context/version/topology
+refusals, full sequencing, focus changes, malformed/partial responses, timeout
+classification, occupied panes, and stop-without-retry behavior. It never contacts
+real Herdr or Docker. These **development tests** use Python and `jq`; Python is
+not a host integration or launcher prerequisite. Without `jq`, these tests skip
+explicitly rather than pretending to establish coverage.
+
+## 5. Reviewed results and optional cleanup for dKOURTXx
+
+**Phase 1 is complete:** `herdr-report.txt` passes 26 assertions and
+`mount-report-pi-1.5.2.txt` passes 23 checks on the rebuilt custom image. The
+historical 22-check Docker report remains in `report.txt`. The copied current
+logs/effective standalone Compose agree with the report; only the two expected
+missing-source probes fail.
+
+The user supplied the entire current run at `pi-docker-mount.dKOURTXx/`. This
+raw tree is not a durable repository input: it contains local paths and Git
+pointers/symlinks to the original `/tmp` fixtures. **Do not stage it in Git or
+run Git cleanup/worktree commands on its copied repositories.** The sanitized
+report has been preserved separately as `mount-report-pi-1.5.2.txt`.
+
+Cleanup is optional and was explicitly requested, not part of automatic test
+completion. On the **original Docker host/daemon**, with no concurrent use or
+new containers using these fixtures, first run:
+
+```bash
+bash tests/host/cleanup-mount-dKOURTXx.sh
+```
+
+This performs read-only checks. To delete both the exact original
+`/tmp/pi-docker-mount.dKOURTXx` and the copied directory beside the script:
+
+```bash
+bash tests/host/cleanup-mount-dKOURTXx.sh \
+  --confirm-original-docker-host --delete-host-fixtures --delete-copy
+```
+
+Use only `--delete-copy` if you want to retain the original fixtures, or only
+`--delete-host-fixtures` to retain the copy. Both deletions require the explicit
+host/daemon attestation; the script cannot prove daemon continuity from a copied
+report. It checks a local Unix-socket Linux daemon and **refuses if any container
+with the run's unique prefix remains**, including stopped or created containers.
+Inspect those exact containers manually before deciding what to do; this script
+does not stop or remove them. Daemon/list/timeout failures also block deletion.
+
+Both present directories must be physical, owned by the current user, and have
+reports matching the checksum-verified saved report. Missing directories are
+reported as already absent. The script never follows fixture symlinks, keeps the
+saved reports, and touches no images, volumes, other runs or Herdr resources.
+A filesystem failure may leave a partially deleted tree: inspect before any
+explicit retry. No host cleanup was executed by the agent.
+
+Offline cleanup safety tests (fake Docker, temporary unit directories only):
+
+```bash
+bash tests/host/test-cleanup-mount.sh
+```
+
 ## What this does not establish
 
-Production launcher/deployment Compose merging, helper lifecycle orchestration,
-Herdr create/open/remove, conversation storage/resume, native restore, and rewind
-remain subsequent integration stages. Herdr checks require an explicitly created
-disposable session with genuine inherited pane/socket context; this suite never
-contacts Herdr. A passing host report is evidence for the mount contract, not
-completion of every Phase 1 or plan acceptance criterion.
+The mount suite never contacts Herdr; the Herdr suite never launches Docker/Pi.
+Production Compose merging, helper lifecycle orchestration, conversation
+storage/resume, native restore, and rewind remain subsequent integration stages.
+Passing **both host reports**, reviewing `MOUNT_CONTRACT.md`, and checking host
+launcher resolution/capabilities closes Phase 1's discovery/contract gate; it
+does not complete the plan's production acceptance criteria. Both current
+reports have now been reviewed; the refreshed 23-check report, not the historical
+22-check report, is evidence for the Pi 1.5.2 prototype baseline.

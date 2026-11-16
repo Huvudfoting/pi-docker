@@ -6,7 +6,10 @@ const assert = require("node:assert/strict");
 const { execFileSync } = require("node:child_process");
 const e = process.env;
 const git = (...args) => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trimEnd();
-console.log(`Runtime: Node ${process.version}; ${git("--version")}`);
+// Read image-owned package metadata without launching Pi or loading extensions.
+const piVersion = JSON.parse(fs.readFileSync("/usr/local/lib/node_modules/@earendil-works/pi-coding-agent/package.json", "utf8")).version;
+console.log(`Runtime: Pi ${piVersion}; Node ${process.version}; ${git("--version")}`);
+assert.equal(piVersion, "1.5.2", "rebuild the selected image for the reviewed Pi baseline");
 const decode = s => s.replace(/\\([0-7]{3})/g, (_, oct) => String.fromCharCode(parseInt(oct, 8)));
 const mounts = fs.readFileSync("/proc/self/mountinfo", "utf8").trim().split("\n").map(line => {
   const fields = line.split(" "); return { target: decode(fields[4]), options: fields[5].split(",") };

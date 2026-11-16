@@ -10,8 +10,11 @@ probe_clean_path() {
 probe_safe_target() {
   local target="$1" reserved
   probe_clean_path "$target" || return
+  # /tmp itself must stay available as container scratch; projects below it are
+  # allowed. /var/run and /var/lock protect aliases of runtime trees as well.
+  [[ "$target" != /tmp ]] || { probe_error 'mount destination replaces container scratch directory: /tmp'; return 1; }
   # Component comparisons, both directions. /probe is specific to this harness.
-  for reserved in /pi /run /opt/pi-docker /usr /bin /sbin /lib /lib64 /etc /dev /proc /sys /boot /root /home/node /probe; do
+  for reserved in /pi /run /var/run /var/lock /opt/pi-docker /usr /bin /sbin /lib /lib64 /etc /dev /proc /sys /boot /root /home/node /probe; do
     if probe_within "$target" "$reserved" || probe_within "$reserved" "$target"; then
       probe_error "mount destination conflicts with reserved path $reserved: $target"; return 1
     fi
@@ -38,7 +41,19 @@ probe_scan_ancestors() {
 probe_mapped_path() {
   # Check the literal normalized path AND resolved target. Canonical paths alone
   # can conceal pointers through aliases absent from the container.
-  local literal resolved
+  local literal resolved component prefix=''
+  local -a components
+  probe_clean_path "$1" || return
+  # Canonical endpoints alone do not prove that intermediate aliases exist in
+  # the container. Conservatively reject symlink traversal in literal pointers,
+  # even when an alias would happen to stay within a bind. Check BEFORE folding
+  # '..', which could otherwise hide a traversal out through an unmounted alias.
+  IFS=/ read -r -a components <<< "$1"
+  for component in "${components[@]}"; do
+    [[ -n "$component" ]] || continue
+    prefix="$prefix/$component"
+    [[ ! -L "$prefix" ]] || { probe_error "Git pointer traverses a symlink alias: $prefix"; return 1; }
+  done
   literal="$(realpath -ms -- "$1")" || return
   resolved="$(realpath -e -- "$1")" || return
   if { probe_within "$literal" "$probe_checkout" || probe_within "$literal" "$probe_common"; } &&
@@ -91,6 +106,11 @@ probe_discover() {
   fi
   probe_mapped_path "$actual_dotgit" || return
   probe_mapped_path "$probe_gitdir" || return
+  if [[ -L "$probe_checkout/.git" ]]; then
+    pointer="$(readlink -- "$probe_checkout/.git")" || return
+    [[ "$pointer" == /* ]] || pointer="$probe_checkout/$pointer"
+    probe_mapped_path "$pointer" || return
+  fi
   if [[ -f "$probe_checkout/.git" ]]; then
     IFS= read -r pointer < "$probe_checkout/.git" || return
     [[ "$pointer" == 'gitdir: '* ]] || { probe_error 'unsupported gitfile format'; return 1; }

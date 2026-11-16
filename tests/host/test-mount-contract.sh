@@ -50,11 +50,15 @@ probe_git -C "$root/contained" init -q --separate-git-dir "$root/contained/metad
 probe_discover "$root/contained"
 [[ "$probe_kind" == external && "$probe_metadata" == 0 ]]
 pass 'contained metadata deduplicated'
-for target in / /pi /pi/child /run /run/child /opt /opt/pi-docker /usr/example /bin /home /home/node/project /proc/self; do
+for target in / /pi /pi/child /run /run/child /var /var/run /var/run/child /var/lock /tmp /opt /opt/pi-docker /usr/example /bin /sbin /lib /lib64 /etc /dev /proc /sys /boot /root /home /home/node/project /proc/self /probe; do
   reject "reserved target $target" probe_safe_target "$target"
 done
 probe_safe_target /runaway/project
 probe_safe_target /home/another-user/project
+probe_safe_target /var/runaway/project
+probe_safe_target /var/tmp/project
+probe_safe_target /tmp/project
+probe_safe_target /workspace/project
 pass 'reserved component boundaries, no project-prefix allowlist'
 reject 'control character path' probe_discover "$root/"$'bad\nname'
 mkdir -p "$root/broken/a/b/c/d"
@@ -89,6 +93,25 @@ ln -s "$main/.git" "$root/metadata-alias"
 admin="$(probe_git -C "$linked" rev-parse --absolute-git-dir)"
 printf 'gitdir: %s\n' "$root/metadata-alias/${admin#"$main/.git/"}" > "$linked/.git"
 reject 'literal Git pointer through unmounted alias' probe_discover "$linked"
-grep -q 'additional/unrepresented path' "$root/rejection.log"
+grep -Eq 'additional/unrepresented path|symlink alias' "$root/rejection.log"
+# A symlinked .git must validate its literal target, not only its realpath.
+rm "$root/separate/.git"
+ln -s '../external metadata' "$root/separate/.git"
+probe_discover "$root/separate"
+[[ "$probe_kind" == external && "$probe_metadata" == 1 ]]
+pass 'direct .git symlink to represented physical metadata'
+ln -s "$root/external metadata" "$root/external-alias"
+rm "$root/separate/.git"
+ln -s "$root/external-alias" "$root/separate/.git"
+reject '.git symlink through unmounted alias' probe_discover "$root/separate"
+grep -q 'symlink alias' "$root/rejection.log"
+# Even matching canonical endpoints can hide an unavailable intermediate hop.
+mkdir "$root/external metadata/subdir"
+ln -s "$root/external metadata/subdir" "$root/bridge"
+ln -s "$root/bridge" "$root/external metadata/alias"
+rm "$root/separate/.git"
+printf 'gitdir: %s\n' "$root/external metadata/alias/.." > "$root/separate/.git"
+reject 'intermediate pointer alias hidden by parent traversal' probe_discover "$root/separate"
+grep -q 'symlink alias' "$root/rejection.log"
 reject 'missing checkout' probe_discover "$root/does-not-exist"
 printf 'All offline mount-contract checks passed.\n'

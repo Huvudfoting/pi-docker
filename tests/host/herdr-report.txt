@@ -1,0 +1,86 @@
+Herdr 0.9.5 host contract report
+Scope: disposable Herdr lifecycle, not Docker/production launcher/restore/rewind.
+Host Git: git version 2.53.0
+Bash: 5.3.9(1)-release
+jq: jq-1.8.1
+CLI: herdr 0.9.5
+Server: 0.9.5
+STEP 1 parent: confirmed_success (exit 0)
+{"type":"workspace_created","workspace_id":"w2","tab_id":"w2:t1","pane_id":"w2:p1"}
+STEP 2 create: confirmed_success (exit 0)
+{"type":"worktree_created","workspace_id":"w3","tab_id":"w3:t1","pane_id":"w3:p1","path":"<FIXTURES>/fixtures/linked checkout"}
+PASS create returns checkout/workspace/tab/root-pane with grouped provenance, no second open/split
+PASS checkout exists
+STEP 3 parent-membership: confirmed_success (exit 0)
+{"type":"workspace_info","workspace_id":"w2"}
+PASS parent has matching primary repository membership
+STEP 4 focus: confirmed_success (exit 0)
+{"type":"session_snapshot"}
+PASS focus preserved
+STEP 5 linked-list: confirmed_success (exit 0)
+{"type":"worktree_list"}
+PASS linked list discovers explicit parent and open child
+STEP 6 linked-create: confirmed_failure (exit 1)
+PASS linked-source rejection created no checkout
+STEP 7 linked-open: confirmed_failure (exit 1)
+STEP 8 reused-open: confirmed_success (exit 0)
+{"type":"worktree_opened","workspace_id":"w3","tab_id":"w3:t1","pane_id":"w3:p1","path":"<FIXTURES>/fixtures/linked checkout","already_open":true}
+PASS open reuses existing workspace and pane
+STEP 9 focus: confirmed_success (exit 0)
+{"type":"session_snapshot"}
+PASS focus preserved
+STEP 10 close: confirmed_success (exit 0)
+{"type":"ok"}
+PASS workspace close retains checkout
+STEP 11 closed-list: confirmed_success (exit 0)
+{"type":"worktree_list"}
+PASS closed checkout retained without open workspace
+STEP 12 reopen: confirmed_success (exit 0)
+{"type":"worktree_opened","workspace_id":"w4","tab_id":"w4:t1","pane_id":"w4:p1","path":"<FIXTURES>/fixtures/linked checkout","already_open":false}
+PASS closed checkout opens as a new workspace
+PASS reopen reports not already open
+STEP 13 dirty-remove: confirmed_failure (exit 1)
+PASS dirty removal preserves checkout and edit
+STEP 14 dirty-retained: confirmed_success (exit 0)
+{"type":"worktree_list"}
+PASS dirty refusal preserves exact open workspace
+STEP 15 clean-remove: confirmed_success (exit 0)
+{"type":"worktree_removed","workspace_id":"w4","path":"<FIXTURES>/fixtures/linked checkout","forced":false}
+PASS removal returns exact target and no force
+PASS explicit clean removal deleted checkout
+PASS removal retained branch
+STEP 16 removed-snapshot: confirmed_success (exit 0)
+{"type":"session_snapshot"}
+PASS removed workspace is absent
+STEP 17 focus: confirmed_success (exit 0)
+{"type":"session_snapshot"}
+PASS focus preserved
+STEP 18 occupied-create: confirmed_success (exit 0)
+{"type":"worktree_created","workspace_id":"w5","tab_id":"w5:t1","pane_id":"w5:p1","path":"<FIXTURES>/fixtures/occupied checkout"}
+PASS second child created and grouped
+STEP 19 shell-info: confirmed_success (exit 0)
+{"type":"pane_info"}
+PASS test pane has no detected agent
+STEP 20 shell-process: confirmed_success (exit 0)
+{"type":"pane_process_info"}
+PASS test pane has only its shell in the foreground
+STEP 21 occupy: confirmed_success (exit 0)
+STEP 22 occupied-ready: confirmed_success (exit 0)
+{"type":"output_matched"}
+STEP 23 occupied-process: confirmed_success (exit 0)
+{"type":"pane_process_info"}
+PASS returned pane has a non-shell foreground occupant; cannot start a helper there
+STEP 24 occupied-open: confirmed_success (exit 0)
+{"type":"worktree_opened","workspace_id":"w5","tab_id":"w5:t1","pane_id":"w5:p1","path":"<FIXTURES>/fixtures/occupied checkout","already_open":true}
+PASS already-open occupied pane returned unchanged, no agent replacement
+STEP 25 occupant-retained: confirmed_success (exit 0)
+{"type":"pane_process_info"}
+PASS open did not replace the foreground process group
+STEP 26 occupant-finished: confirmed_success (exit 0)
+{"type":"output_matched"}
+STEP 27 focus: confirmed_success (exit 0)
+{"type":"session_snapshot"}
+PASS focus preserved
+Not tested: Docker/production Compose, Pi startup/readiness, conversations/restore, rewind.
+Parent and occupied checkout/workspace intentionally retained. See receipts before any requested cleanup.
+RESULT: PASS (26 assertions)

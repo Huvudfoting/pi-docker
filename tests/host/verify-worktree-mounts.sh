@@ -202,6 +202,11 @@ probe_git -C "$separate" add tracked
 probe_git -C "$separate" commit -qm fixture
 configure "$separate" write
 step 'separate Git directory with normal Git writes' run_container separate-git-dir
+# Direct .git symlinks are supported; further pointer aliases fail offline.
+rm -- "$separate/.git"
+ln -s "$fixtures/external metadata" "$separate/.git"
+configure "$separate"
+step 'direct .git symlink reaches represented physical metadata' run_container dotgit-symlink
 contained="$fixtures/contained metadata checkout"
 mkdir "$contained"
 probe_git -C "$contained" init -q -b main --separate-git-dir "$contained/metadata"
@@ -217,6 +222,6 @@ configure "$a"
 export PROBE_COMMON="$fixtures/metadata-that-does-not-exist"
 step 'missing metadata bind source fails closed' expect_missing_source "$PROBE_COMMON"
 step 'container exits left linked worktree intact' test -f "$a/.git"
-step 'container exits left separate checkout intact' test -f "$separate/.git"
+step 'container exits left separate checkout and direct .git symlink intact' test -d "$separate/.git"
 printf '\nNot tested: production launcher merge, Herdr mutations, conversations, restore, rewind.\n' >> "$report"
 printf 'These remain separate integration stages.\n' >> "$report"
