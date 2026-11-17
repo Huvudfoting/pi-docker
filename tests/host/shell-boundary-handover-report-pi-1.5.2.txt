@@ -1,0 +1,75 @@
+Phase 3 reviewed shell-boundary handover diagnostic — Pi 1.5.2
+
+Result: DIAGNOSTIC COMPLETE; official B reference CURRENT.
+This is NOT a native restore PASS or Phase 3 completion.
+
+Evidence origin: /tmp/pi-docker-native.Z8likvIQ/
+Reviewed copied evidence: tests/host/pi-docker-native.Z8likvIQ/
+Project: pinative-pi-docker-native-z8likviq
+Image: pi-docker:custom
+Image ID: sha256:4fbac6482177e793a7d622c92d11cbdc0dcd3fd3523d63755c440f265bf6623b
+Host: Bash 5.3.9(1)-release, Git 2.53.0, Compose 5.7.1,
+Docker client/server 29.10.0; Herdr snapshots report server 0.9.5.
+Observed runtime Pi: 1.5.2.
+
+Integrity review
+- All 13 inputs.sha256 entries match the copied files.
+- Reporter hash and both generated-control hashes match copied files.
+- Driver hash matches current tests/host/verify-native-restore.sh:
+  d66adb4ad0fcdc738cdac6ef389769ff2890d8b8119dfc545dbc337e7a0bf14c
+- All 12 copied source resources with direct repository counterparts match
+  current production/test source byte-for-byte; the fixture Compose wrapper is
+  the expected extends/offline/network-none/read-only/resource-bounded wrapper.
+- Official reporter SHA256:
+  2c5272d732b475bbf91a027203b1f98d25fe43d2c1402530a442b288aeaca1e4
+  This is also the tagged Herdr 0.9.5 reporter reviewed in the source analysis.
+
+Observed boundaries (PID / PGID / foreground PGID)
+- ready-a shell: 81754 / 81754 / 81754
+- A step:        82838 / 82838 / 82838, parent 81754
+- after-a shell:81754 / 81754 / 81754
+- B step:        83466 / 83466 / 83466, parent 81754
+- after-b shell:81754 / 81754 / 81754
+- assess step:   84177 / 84177 / 84177, parent 81754
+All six saved timestamps are strictly ordered. Same interactive shell, distinct
+A/B foreground jobs, real shell ownership between them. Same pane and terminal
+identities throughout. These are saved host receipts, not a new live probe.
+
+Official state and persistence
+- Preflight and pre-A snapshots: one workspace/tab/pane, no agents.
+- A checkpoint: official herdr:pi path exactly equals A's actual persisted file;
+  idle state, state_change_seq 3.
+- Crucially, the pre-B snapshot has NO agents and NO pane session reference.
+  A's identity was cleared before B launched, rather than silently substituted.
+- B checkpoint: official herdr:pi path exactly equals B's distinct persisted file;
+  idle state, state_change_seq 7. handover.json classifies current, with
+  nativeRestorePass=false. Raw snapshots and checkpoint observations agree.
+- A and B have distinct IDs/files/container hostnames, titles Handover A/B,
+  cwd/header cwd /workspace, and only their respective expected user AND
+  offline-fixture assistant turn. Settled stage, hasHerdr=true, Pi 1.5.2.
+- Exactly two session files; exact selected-directory/backend storage and the
+  same correct v3 launch record. Persisted files equal saved history copies;
+  B did not modify A. No checkpoint error artifacts.
+- Visual observations explicitly confirm A and B, including B's fresh history.
+- All three step results exit 0; all eight saved run/project container queries
+  are empty. This is saved evidence, not a claim about current host resources.
+- Fifteen independent grouped review assertions passed against the raw copy.
+
+Interpretation and limits
+The prior ordinary single-driver run really retained A; that original result
+remains FAIL/INTERRUPTED with B visual answer no. It is not relabeled by this run.
+The changed experimental variable is verified foreground-job/shell boundaries.
+This run shows ordinary same-pane A→B succeeds and Herdr clears A when these
+boundaries are present. Together with tagged-source probe suppression, it
+supports a driver-boundary explanation for the earlier failure. Exact internal
+server branch/timing was not traced, and the earlier run has no PGID receipts.
+
+No production reset/release, reporter patch, event relabeling, server restart/
+upgrade, new pane topology, linked worktree, or native reopen was part of this
+experiment. No production lifecycle fix is justified solely by the old driver
+finding. Next recommended work is to adapt the remaining native-protocol harness
+to explicit shell boundaries, then validate linked native reopen. Automatic
+server-restart restore, base/cross-image continuity and other Phase 3 gates stay
+open. No host rerun, live API request, cleanup, staging or commit was performed
+by the reviewing agent. Preserve the original fixtures; do not stage copied
+full deployments wholesale.

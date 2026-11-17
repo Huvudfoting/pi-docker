@@ -1,0 +1,65 @@
+Phase 3 native launcher protocol: ordinary pass, linked seed stale report
+
+Origin: /tmp/pi-docker-native.yaTn8dy1/
+Supplied artifacts: tests/host/pi-docker-native.yaTn8dy1/
+Compose project: pinative-pi-docker-native-yatn8dy1
+Pi: 1.5.2; Herdr server: 0.9.5; protocol: 22.
+
+RESULT: PARTIAL. Ordinary native reopen verified; linked native gate BLOCKED.
+Original result.txt: FAIL/INTERRUPTED (exit 1).
+This is NOT the earlier managed-readiness harness false negative.
+
+Evidence reviewed:
+- All eleven copied input hashes, official reporter hash and current driver hash
+  match supplied artifacts. The earlier interactive_ready correction is present.
+- Ordinary seed and native managed-path reopen both passed automated assertions
+  and explicit user visual confirmations. The same ID/file/title/header cwd and
+  original plus new user/assistant fixture history are preserved.
+- Ordinary ID: 01a1eb58-b061-7038-b6ca-38ccce58c81d.
+- Linked-subdirectory seed also reached settled state and persisted exactly its
+  phase3-linked-seed / offline-fixture:phase3-linked-seed turn in its own exact
+  selected-directory/backend storage. Its header cwd is the path-preserving
+  linked checkout's selected packages/backend subdirectory. Its v3 record agrees.
+- Linked ID: 01a1eb5b-96f1-74d5-8c21-e2425ce88245.
+- At the linked checkpoint, Herdr's official herdr:pi session path is still the
+  PREVIOUS ordinary conversation, not the linked seed. The ordinary reference
+  uses storage key b4e3bc40918f39050476bb2604a33075d3d185b67a713e699ccd1eea7eb921e7;
+  linked Pi's actual file uses key
+  5e049e461887c1e0d6f09442aa80c21099946ba754d602bc321a464d860005a0.
+- Herdr agent_status remains idle and state_change_seq remains 5, as in the
+  ordinary reopen snapshot. The terminal title changed to Native linked
+  subdirectory, but the reported identity did not follow it.
+- Saved run-label and Compose-project container queries both have no matches.
+- No linked checkpoint success, linked native reopen, linked visual confirmation
+  or final aggregate evidence was reached/generated.
+
+Assessment:
+The checkpoint correctly rejected a different conversation path. Do not relax
+that assertion, substitute Pi's path as though officially reported, or claim a
+linked native restore success. A valid linked mount/persisted seed is not proof
+of correct Herdr identity handover. Ordinary native launcher protocol is now
+supported by this host evidence, not automatic server-restart restoration.
+
+Source-based hypothesis (not a proven host root cause):
+Tagged Herdr 0.9.5 src/terminal/state.rs permits herdr:pi session replacement for
+new/resume/fork but not startup; a retained same-owner lifecycle authority with a
+different session ref can reject a startup replacement. The installed official
+reporter emits Pi's startup reason and does not register a session_shutdown
+release. Docker hides native Pi process identity from the host detector, which
+may prevent ordinary process-exit reconciliation between launches. This is
+consistent with the stale reference, but no server diagnostic trace or controlled
+same-pane replacement reproduction has yet established the exact mechanism.
+It is not established that linked worktrees specifically cause the problem.
+
+Next diagnostic should distinguish same-pane different-conversation handover
+from linked-layout behavior, without altering official reporting, clearing
+session state, upgrading/restarting the server, or accepting stale references.
+Any production lifecycle policy change needs explicit review first. No live
+requests, retries, resets/releases, cleanup, or server stop were performed by the
+reviewing agent. Original evidence remains unchanged. Offline observer tests
+include this stale-valid-ordinary-path rejection; all 15 pass.
+
+Phase 3 remains open. Automatic Herdr server-restart restore, linked native reopen,
+base/cross-image continuity and remaining native failure/transition/lifecycle
+gates remain pending. Retain this sanitized summary as durable evidence; the
+supplied full deployment is raw artifact material, not a tree to stage wholesale.

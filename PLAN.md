@@ -207,7 +207,576 @@ implementation and reviewed host-validation gate are tracked below.
 
 ## Next-session handoff
 
-### Immediate next step: remaining Phase 3 restore and interactive gates
+### Session pause: native protocol passed; select the next Phase 3 gate
+
+The user requested a status reminder and a handoff to a new session. No further
+implementation, host run or live mutation is requested during this pause.
+Subsequently approved cleanup is completed as recorded below; do not repeat it.
+Start by reading this section, the Phase 3–5 sections below, and the opening of
+`tests/session/README.md`; recheck Git status and preserve all user changes.
+Later entries here are historical and may describe gates as pending that have
+since passed. This opening handoff and the latest durable reports take precedence.
+
+**Current milestone:** Phases 1 and 2 passed. Phase 3 offline persistence (14 host
+checks), interactive resume (`nhtANrCS`), shell-boundary ordinary handover
+(`Z8likvIQ`) and ordinary PLUS linked-subdirectory native managed-path reopen
+(`0rXTuSjw`) are passed and reviewed. Phase 3 is NOT complete; Phase 4 isolated-
+helper orchestration has not begun. Existing shared-checkout helper functionality
+is not the Phase 4 worktree orchestration deliverable.
+
+Latest durable report:
+`tests/host/native-boundary-restore-report-pi-1.5.2.txt`.
+It verifies four launches, stable official refs/IDs/files/history/cwd/v3 records,
+four visual yes answers, four distinct containers, all five step exits 0 and
+12 saved empty container queries. The supplied copy includes the final marker
+and assessment; no omitted-marker exception is needed. No repeat run is needed.
+
+**Remaining Phase 3:**
+- Actual automatic Herdr restoration after a server restart. The passed gate
+  only exercised official reporting plus launcher reopen with --session; it did
+  not restart Herdr. Recommended next task is to design a reviewed disposable-
+  session restart test, but no restart test or host mutation is selected or
+  authorized by this handoff. Obtain explicit consent before preparing/executing
+  a procedure that restarts a server; never use an existing working session.
+- Separate base-image runtime and real custom/base/custom conversation continuity.
+  Existing image-switch unit tests are not runtime evidence. Do not pull, retag,
+  remove images or alter availability without explicit user review/approval.
+- Actual Docker replacement/layout-transition evidence, especially replacement
+  at the same cwd. Different container-cwd continuity is explicitly unsupported;
+  do not add migration, historical identity/type fields, header rewriting, pointer
+  repair or mount-policy changes to hide that limitation.
+- Outstanding native failure paths: missing recorded checkout/exact subdirectory,
+  invalid/inaccessible metadata, missing/empty/unreadable/malformed explicit
+  session, with clear errors and no replacement conversation/checkout or Pi
+  Continue/Fork fallback. Some launcher/offline/host negatives already pass;
+  target gaps rather than repeating the whole completed matrix.
+- Remaining integrated exit/container-exit versus workspace-close/worktree-removal
+  and restore-after-removal behavior. Herdr's disposable contract already verified
+  close/removal semantics; ensure deployment conversations/records remain and a
+  removed checkout is not recreated. Broader helper removal tests belong Phase 4/5.
+
+**Beyond Phase 3:** Phase 4 adds explicit isolated-worktree helper create/open/
+start/resume/remove through the existing Node adapter and skill, with shared
+helpers remaining the default, provenance-based parent discovery, occupied-pane
+protection, focus preservation, exact-directory/latest-usable conversation
+selection across names, retained identities/step receipts and stop-on-uncertainty
+without retries/force/cleanup. Phase 5 completes regression/host coverage and
+user/agent/skill documentation alongside implementation, including two-worktree
+rewind/index/concurrency/retention and custom/base/custom rewind continuity,
+blocked/unblocked readiness, helper error/partial-result cases, and the full
+acceptance matrix. Do not treat all Phase 5 tests as absent: many launch/mount/
+restore tests already exist. Read the actual sections below for the full scope.
+
+**Blocker finding retained:** the legacy noninteractive single-driver job kept
+A's official identity when B started. Tagged Herdr 0.9.5 skips routine process
+probes with live lifecycle authority and unchanged foreground PGID; the launcher
+already exports the supported wrapper identity hint. Separate top-level jobs
+with actual shell returns clear identity and pass the native workflow. No
+production lifecycle reset, reporter patch, event relabeling, server upgrade or
+new pane topology is indicated. Old interrupted/no visual findings remain real,
+not relabeled by the later passes. Source analysis:
+`tests/session/HERDR_SAME_PANE_ANALYSIS.md`.
+
+**Harness/tools:** `tests/host/verify-native-restore.sh --prepare-native-boundary`
+with consented --run prepares only; `native-boundary.sh` emits four independent
+commands/markers and assessment. Do not run the legacy plain --run corpus
+unchanged. Last local validation: 40 Node tests pass, 1 skipped because test-only
+jq is absent; PTY/transport guards use inert substitutes. Bash syntax and current
+whitespace checks passed. No global dependency installation. For a new live
+Herdr task read the prescribed upstream and Docker adapter skills; preserve real
+inherited context. This agent has no Docker/live Herdr context and made no live
+API requests; do not request Docker-socket exposure.
+
+**Preserve:** PLAN.md and tests/session/README.md have user-staged AND unstaged
+changes. Scripts/tests/reports/source analysis remain untracked; this agent has
+not staged or committed. Preserve all seven sanitized report files, source,
+tests and documentation. Keep earlier Phase 1/2 checksum-pinned evidence unchanged,
+including intentional whitespace.
+
+**Cleanup completed after explicit approval:**
+- The user reports deleting the original /tmp fixtures on the host.
+- The user confirmed successfully stopping/deleting all seven explicitly approved
+  named Herdr test sessions, without pasting output. Record this as user-confirmed,
+  not independently live-inspected. `default` was explicitly excluded.
+- This agent deleted ONLY these seven untracked raw copied directories under
+  tests/host/: native 0rXTuSjw, 7LIAX9Ww, Z8likvIQ, yXQDav7Z, yaTn8dy1; resume
+  24uFOGYH, nhtANrCS. Before deletion it verified all durable reports existed,
+  no tracked files/root symlinks/canonical-path surprises, and no nested mounts.
+  Reports, scripts/tests, documentation and staged changes were preserved.
+- Raw fixtures are no longer available. Durable reports are the review record;
+  do not recreate/rerun completed gates merely to reconstruct deleted artifacts.
+  Older preservation instructions below describe historical pre-cleanup state.
+- No Docker cleanup, worktree-metadata repair/pruning, default-session deletion,
+  global configuration change or live API request was performed by this agent.
+  No current Docker resource inventory was supplied; do not claim one was checked.
+  No further cleanup is requested; do not run prune or infer host resource state.
+
+### Reviewed native shell-boundary gate PASS: ordinary AND linked reopen
+
+The user supplied `tests/host/pi-docker-native.0rXTuSjw/`. Raw review confirms
+all four seed/reopen launches: ordinary and linked-subdirectory native managed-
+path reopen pass, with official herdr:pi exact references, stable IDs/files,
+complete original plus new user/assistant history, titles/cwd/header cwd, exact
+storage/v3 records and all four explicit visual yes confirmations. Two session
+files/records and four distinct container receipts verify; restored files remain
+unchanged by later steps. All input/driver/reporter/control/seed-evidence hashes
+match, along with 11 source counterparts. Twenty-four grouped raw review checks
+pass. Durable sanitized report:
+`tests/host/native-boundary-restore-report-pi-1.5.2.txt`.
+
+The user initially described omitting the last marker and explicitly authorized
+assuming it passed if all else matched. The supplied copy actually includes
+`shell-after-restore-linked.txt`, an ordered final shell receipt, assessment
+process/snapshot/results and PASS. No missing-marker exception is needed. All
+five steps exit 0; all six preflight/prelaunch/assessment snapshots show cleared
+identity and unchanged one-pane topology; all 12 saved container queries are
+empty. This verifies the full native LAUNCHER protocol gate, not automatic
+Herdr restoration after server restart. Do not repeat the completed host run.
+
+No production lifecycle fix is indicated by the earlier single-driver finding.
+Phase 3 remains open for automatic server-restart restore, base/cross-image and
+outstanding layout/failure/lifecycle integration gates. A server-restart test
+requires its own explicit user decision and reviewed procedure in a genuinely
+new disposable session; do not infer restart/upgrade or working-session access
+consent from the passed native protocol test. Do not begin Phase 4 yet.
+
+No production change, live API call, host rerun, cleanup, staging or commit was
+made during this review. Preserve all seven copied fixture deployments intact
+and un-staged; keep sanitized reports as durable evidence. Saved empty queries
+are not a claim about current host resources.
+
+### Full native shell-boundary harness prepared; host run pending
+
+The user requested preparing the remaining native gate with explicit shell
+boundaries. `tests/host/verify-native-restore.sh` now supports
+`--prepare-native-boundary` with either preflight or consented run. Run prepares
+only: no Pi launch. It retains the fixture-only setup and creates ordinary plus
+linked-subdirectory selections; `control/INSTRUCTIONS.txt` contains separate
+seed-ordinary, restore-ordinary, seed-linked, restore-linked and assess commands,
+with built-in interactive-shell return markers. Read the opening native-gate
+section of `tests/session/README.md` for exact fresh-session host instructions.
+The plain --run corpus is documented as the legacy single-driver workflow,
+not the next host gate. Old evidence copies remain untouched.
+
+New source-only `tests/host/native-boundary.sh` validates inherited context,
+same shell parent/distinct foreground groups, single-start/order/result guards,
+pinned inputs/image, and version/topology plus no agents/session reference before
+each launch/assessment. It never resets state. Each step retains run/project
+container queries and blocks continuation on matches or inspection failures.
+Restore verifies seed checkpoint/result/record hashes and consumes only the
+OFFICIAL seed reference via --session, without replaying flags. Existing strict
+capture/visual/history/cwd/v3 checks are retained. Final assessment checks two
+session identities, four container receipts, unchanged restored files and clean
+retained linked checkout. PASS would cover native launcher protocol only, not
+automatic server-restart restore or Phase 3 completion.
+
+Local Node suites: **40 passed, 1 skipped** (test-only jq absent for the real-jq
+aggregate test). Generated steps and failure guards run in isolated local PTYs
+with explicitly inert Docker/Herdr/Pi/jq substitutes; they do not certify JSON
+filter/runtime behavior or actual host integration. Bash syntax/whitespace pass.
+No package install, production change, live API request, Docker/host rerun,
+cleanup, staging or commit was performed. Next: user-run NEW disposable host
+native-boundary gate, then review raw evidence. Phase 3 remains open.
+
+### Reviewed shell-boundary host result: B current; A cleared before B
+
+The user supplied `tests/host/pi-docker-native.Z8likvIQ/`. Raw evidence confirms
+**CURRENT B** with verified interactive-shell returns and distinct A/B foreground
+jobs of the same shell, same pane/terminal. The decisive pre-B official snapshot
+has no agents and no pane session reference: A was actually cleared, not replaced
+by the observer. B's official exact path matches its distinct persisted history;
+state sequence advances from A's 3 to B's 7. Both visual answers are yes.
+All 13 copied input hashes, reporter, driver and two generated-control hashes
+match; 12 source counterparts match repository bytes. Exact storage/v3/history,
+unchanged A, exactly two sessions and distinct container receipts all verify.
+All three steps exit 0 and all eight saved container queries are empty.
+Durable sanitized report:
+`tests/host/shell-boundary-handover-report-pi-1.5.2.txt`.
+
+This supports the foreground-job/test-driver explanation; it is not a production
+lifecycle defect requiring a reset or reporter patch. The exact internal server
+branch/timing is not traced and earlier run PGIDs were not saved. Preserve the
+original stale-reference/no visual/interrupted result unchanged. The new result
+is **DIAGNOSTIC COMPLETE, NOT native restore PASS**. No linked checkout, native
+reopen or server restart was exercised. Phase 3 remains open.
+
+Next recommended task: adapt the remaining native-protocol harness to explicit
+shell boundaries (after review), then test linked native reopen. Do not rerun
+the old single-driver corpus unchanged or implement production lifecycle
+workarounds. Automatic server-restart restore and other base/cross-image/layout/
+failure gates remain separate. No live API call, host rerun, cleanup, production
+change, staging or commit was done in this evidence review. Keep all six full
+copied fixture directories un-staged; preserve sanitized reports as durable
+review evidence and do not infer current host resource state from saved queries.
+
+### Approved shell-boundary diagnostic prepared; host execution pending
+
+The user chose **prepare shell-boundary diagnostic** after the source review,
+not a production lifecycle workaround. The host native driver now accepts
+`--prepare-shell-boundary` with `--run --confirm-disposable-session`. It prepares
+only, using existing new-disposable-session guards/private fixture setup and
+no Pi launch. `control/INSTRUCTIONS.txt` contains separate top-level commands:
+built-in `ready-a` shell marker, A, `after-a`, B, `after-b`, assessment.
+Read the opening section of `tests/session/README.md` for full host instructions.
+
+Test-only `tests/host/shell-boundary-handover.sh` enforces the same inherited
+pane/socket and interactive Bash parent, real foreground shell markers, distinct
+A/B foreground groups, single-start/order guards, input/image checks, version/
+topology checks and per-step container queries. No lifecycle state resets,
+reporter patch/replacement, fabricated context, new panes, native reopen or
+server restart is performed. It retains prelaunch snapshots and strict official
+checkpoint/local history/v3 checks; shared A/B assessment was extracted unchanged.
+Diagnostic completion is not native restore PASS. No full rerun of the old
+single-driver reproduction is needed. No live host/API operations occurred here.
+
+Local suites: **32 pass, no failures/skips**, including Linux PTY markers and
+generated-step execution with inert stubs; Bash syntax and whitespace pass.
+These do not certify actual Docker/Herdr host execution. The source investigation
+and earlier original no/interrupted visual finding remain unchanged. Phase 3 is
+open. Next: user-run fresh disposable shell-boundary diagnostic, then review its
+process-group/snapshot evidence before choosing any production remedy.
+
+### New source finding: foreground-job boundary may explain stale authority
+
+Read `tests/session/HERDR_SAME_PANE_ANALYSIS.md` before selecting a fix.
+Tagged Herdr 0.9.5 source confirms the live-authority startup rejection, but
+also exposes a driver-specific candidate mechanism: full-lifecycle authority
+skips process probes while the foreground PGID stays unchanged. The host driver
+is noninteractive Bash without job control, spanning A, its prompts and B as
+one foreground job; there is no intervening return to the pane shell.
+A new isolated Linux PTY regression verifies that Bash process-group property
+locally. It does not establish historical host PGIDs or the exact server branch.
+The launcher already exports `HERDR_AGENT=pi`, and Herdr supports wrapper hints;
+therefore "Docker hides Pi" alone is not an adequate root-cause conclusion.
+The unknown/custom-agent shell-return fallback does not apply to known `pi`.
+
+The report also distinguishes managed-path rejection from the separate ID-only
+conflict helper, and notes that an API response is not proof a report applied.
+Official tagged reporter hash matches the focused run. Upstream Rust tests were
+reviewed, not executed (Rust/Cargo unavailable). Local Node suite including the
+new `test-driver-process-groups.mjs`: **25 passed, no failures/skips**.
+
+Recommended next step: explicitly choose preparation of a diagnostic comparing
+verified top-level interactive shell boundaries against the existing single-job
+driver, recording safe PGID/process observations. Do not silently alter test job
+control/topology or request another identical reproduction. No production fix,
+reporter patch/reset/release, host rerun, live API call, staging or cleanup was
+performed. Existing evidence and the original interrupted/no visual result stand;
+this finding does not prove a production defect or a successful native gate.
+
+### Session pause: resume with same-pane lifecycle investigation
+
+The user is ending this session because context is nearly full. No further host
+test, cleanup or mutation is requested. Start the next session by reading this
+handoff and `tests/session/README.md`, and rechecking Git status. Do not repeat
+host runs merely to reconstruct already-reviewed evidence.
+
+Current decision/task:
+- Interactive resume picker passed (`nhtANrCS`). Ordinary native managed-path
+  reopen passed (`yaTn8dy1`), but automatic Herdr server-restart restore has never
+  been tested. Linked native reopen remains blocked.
+- Focused ordinary A→B handover (`7LIAX9Ww`) reproduces the stale official path
+  without any worktree. This is enough reproduction evidence; **do not ask the
+  user for another identical run**. Original B visual answer was no, and original
+  result remains interrupted; do not invent successful visual confirmation.
+- Next investigate same-pane lifecycle/session ownership before selecting a fix.
+  Tagged Herdr 0.9.5 `src/terminal/state.rs` rejects different same-owner Pi
+  session replacement on `startup` (allows `new`/`resume`/`fork`), and the official
+  reporter has no shutdown release. Docker can mask native Pi process identity
+  from host process-exit detection. These source observations are consistent
+  with the finding, but the precise root cause/remedy is not yet established.
+  Relevant source: `src/app/agents.rs`, `src/terminal/state.rs`,
+  `src/integration/assets/pi/herdr-agent-state.ts`; use the v0.9.5 tag. Prior
+  downloads under `/tmp/pi-herdr-phase3-source/` are disposable, not durable inputs.
+- Do not weaken exact-reference assertions, silently replace the reported path,
+  release/reset authority, modify the official reporter, change topology, or
+  upgrade/restart a server as automatic recovery. Any production lifecycle/
+  security policy change requires the ask-user decision handshake first.
+- The user approved host-run tests in genuinely NEW disposable Herdr sessions,
+  not access to an existing working session. This agent has no inherited Herdr
+  context/socket or Docker. No live APIs were contacted here. Keep that boundary;
+  read the prescribed Herdr skills before any future control operations.
+
+Latest test-only change: focused mode now writes automated assessment/evidence
+before a separate B history/title-only question. This prevents a no/interrupted
+visual answer from discarding the observed mismatch. **This changed driver has
+not had a new host run**, and no rerun is needed just to re-establish the finding.
+Local checks: all 24 Node observer/classifier/driver-guard tests pass, Bash syntax
+for launcher/libs/host scripts and `git diff --check` pass. Node command:
+`node --test tests/session/test-native-checkpoint.mjs tests/session/test-session-handover.mjs`.
+These offline tests do not prove production readiness or the mechanism above.
+
+Preservation: `PLAN.md` has user-staged changes plus this session's unstaged
+handoffs; leave both intact. Test scripts/extensions/sanitized reports are still
+untracked, README changes unstaged. No commit/staging was done by this agent.
+All five supplied `pi-docker-resume.*` / `pi-docker-native.*` directories under
+`tests/host/` are full raw copied deployments, not report-only folders; **do not
+stage them wholesale**. Preserve the five sanitized report `.txt` files as the
+durable review. No fixtures, containers, Git worktrees or Herdr sessions have
+been cleaned up here; do not infer which original host resources still exist.
+Phase 3 stays open; do not begin Phase 4 helper orchestration.
+
+### Latest result: focused ordinary A→B reproduced stale Herdr identity
+
+The user supplied `tests/host/pi-docker-native.7LIAX9Ww/`. Raw evidence confirms
+**stale_previous without worktrees**: A and B are distinct fresh conversations in
+the same exact ordinary directory/backend storage/pane, both with expected
+persisted user/assistant histories, IDs/titles/cwd/v3 record. B did not modify A;
+there are exactly two session files and no fixture .git entries. During B, Herdr
+still reports A's path and state sequence despite the changed terminal title.
+Input/reporter/pre-review-driver hashes match; saved container queries are empty.
+Durable report: `tests/host/ordinary-handover-stale-reference-pi-1.5.2.txt`.
+
+The original driver run is still FAIL/INTERRUPTED: B's visual answer was no after
+describing the checkpoint STOP, so the old generic questionnaire stopped before
+saving automated assessment files. Raw evidence independently establishes the
+stale identity; do not invent a yes, relabel native success or ask another rerun
+just to reproduce it. The driver now saves classification/aggregate evidence
+before a distinct B title/history-only question, keeping findings even on no or
+interruption. All 24 offline tests pass including this ordering regression;
+Bash syntax and whitespace checks pass. Original artifacts are unchanged.
+
+**Next:** investigate same-pane lifecycle/session ownership before choosing a
+production fix. Linked layout is not necessary for this failure; the exact
+source mechanism is not yet proven. Prior tagged-source hypothesis is retained
+below. No lifecycle release/reset, official reporter patch, server upgrade/
+restart, topology workaround or weakened reference assertion is authorized as
+automatic recovery. No production code change, live API request, host retry or
+cleanup was performed during review. Phase 3 remains open; a full native/linked
+restore and automatic server-restart restore are not established by this finding.
+
+### Earlier task: focused same-pane ordinary handover diagnostic prepared
+
+The user explicitly requested the focused test. The existing
+`tests/host/verify-native-restore.sh` now accepts `--focused-handover` with the
+same new-disposable-session/consent/version/context/topology guards. It launches
+two NEW ordinary conversations A and B in the exact same directory, `backend`
+storage and pane. No Git repository/worktree is created in this mode, no native
+reopen is attempted and no official reporter/session state is reset or modified.
+
+A must have a correct official checkpoint. B's local history is validated
+separately from the official raw snapshot: the strict checkpoint still rejects
+a wrong path, but diagnostic mode can classify `stale_previous` versus `current`
+without claiming native restore success or substituting Pi's path as official.
+Missing/blocked/pending/nonofficial/unrelated reports stop as ambiguous. Both
+histories/IDs/files, unchanged A history, same exact storage/record and exactly
+two session files are checked; raw errors/snapshots and manual observations are
+retained. A B-checkpoint identity/path STOP is an expected possible finding:
+quit without retry and let the host classify it. Completion is explicitly
+DIAGNOSTIC COMPLETE, not a native restore PASS.
+
+`tests/host/session-handover.sh` holds a source-only observed-reference classifier;
+`tests/session/test-session-handover.mjs` adds eight offline guard/classifier checks.
+Together with the observer tests, all 23 checks pass locally; Bash syntax and
+whitespace checks pass. These do not certify actual host Docker/TUI execution.
+The focused host run has NOT happened. Instructions/return evidence are in
+`tests/session/README.md`. No production changes, live requests, reruns, cleanup,
+image operations or staging/commits were performed here. Phase 3 remains open.
+
+### Latest reviewed result: ordinary native reopen passed; linked seed found stale identity
+
+The user supplied `tests/host/pi-docker-native.yaTn8dy1/`. Review verifies all
+copied input/reporter/driver hashes and ordinary seed/native-reopen history,
+ID/file/title/cwd/v3 record plus explicit visual confirmations. The earlier
+managed-readiness harness correction worked. The linked-subdirectory seed also
+persisted correctly in its own path-preserving cwd and exact host storage.
+
+**New real finding:** at the linked checkpoint Herdr still reports the previous
+ordinary conversation's managed path under `herdr:pi`, despite Pi's distinct
+linked file/ID and changed terminal title. Official status remains idle and
+state_change_seq remains 5. The checkpoint correctly stops on the wrong path;
+no linked native reopen or visual confirmation was reached. Saved run/project
+container queries are empty. Durable sanitized review:
+`tests/host/native-restore-stale-reference-pi-1.5.2.txt`.
+
+Do NOT weaken the reference assertion, silently substitute Pi's path, claim the
+full native gate passed, or simply request another identical full rerun. Tagged
+Herdr 0.9.5 source suggests same-pane lifecycle authority may retain the old Pi
+session: startup is not an allowed same-owner session replacement, the reporter
+has no shutdown release, and Docker masks native Pi process detection. This is a
+hypothesis, not a proven host root cause or proof of a worktree-specific defect.
+Next diagnostic should distinguish same-pane different-conversation handover
+from linked-layout behavior. Any production lifecycle change needs explicit
+review; do not release/reset state, patch the official reporter, upgrade/restart
+Herdr, or change launch semantics as automatic recovery.
+
+The offline observer now has a stale-valid-ordinary-reference regression and all
+15 tests pass. No production code changed, no live requests or rerun/cleanup were
+performed during review, and raw evidence remains unchanged. Phase 3 is open;
+automatic server restart and linked native reopen remain unverified.
+
+### Earlier result: native seed checkpoint exposed a test-harness false negative
+
+The user supplied full fixture evidence at
+`tests/host/pi-docker-native.yXQDav7Z/` after the test stopped before visual
+observation with "Official reporter identity/path/readiness mismatch". Review
+confirms a correct ordinary seed: settled real Pi 1.5.2 history, exact selected
+storage/v3 record, and official `herdr:pi` identical managed path with idle status.
+All supplied input/reporter/pre-fix-driver hashes match; saved run/project
+container queries are empty.
+
+**Root cause was the harness, not the user:** it demanded `interactive_ready`
+from a directly launched foreground Pi. Tagged Herdr 0.9.5 source confirms this
+flag applies to managed `agent start` startup only; false is omitted from JSON.
+Both observer and host assertion are corrected to retain local idle + settled
+history + official identity/path/idle-or-done checks and reject pending launches,
+without demanding/synthesizing managed readiness. Production helper readiness
+and all launcher policy are unchanged. Offline tests now pass 14 checks,
+including omitted/false readiness and pending/blocked rejection. Durable review:
+`tests/host/native-restore-partial-pi-1.5.2.txt`.
+
+No native reopen/linked-subdirectory TUI launch or visual confirmation was reached.
+The corrected gate needs a fresh explicitly requested host run. No automatic
+rerun, cleanup, evidence modification or live API request was performed during
+review. Keep fixture artifacts unchanged; do not stage full copied deployments.
+Automatic Herdr server-restart restore remains separate; Phase 3 is still open.
+
+### Earlier task: consented disposable native-protocol test prepared
+
+After the interactive pass, the user explicitly approved preparing a guided
+host-run native Herdr test in a new disposable session with the offline provider.
+This is not permission to expose the user's working session. This agent has no
+inherited Herdr context/socket and has made no live Herdr requests.
+
+New `tests/host/verify-native-restore.sh` provides context/topology/version-checked
+`--preflight` and explicitly confirmed `--run`, with fixture-only copied resources,
+real official reporter installation, bounded read-only snapshot observation and
+foreground ordinary/linked-subdirectory seed/native reopen checks. A guarded
+`tests/session/native-checkpoint.ts` command observes the actual `herdr:pi`
+reported managed reference; it does not report identity or construct resume argv.
+The actual copied launcher consumes that reference with only `--session`; no
+original flags/image choice are replayed. Private settings/default model,
+PI_OFFLINE, no default tools, network none and fresh HOME/auth keep restore offline.
+Input/reporter hashes, snapshots, histories, v3 records and receipts are retained.
+
+**Scope boundary:** this first native gate tests official reporting plus the
+launcher managed-path reopen protocol. It does NOT restart Herdr and does not
+prove automatic restoration after a server restart. That remains a separate gate,
+as do native missing/unusable-session failure paths, base/cross-image continuity,
+Docker transitions and lifecycle semantics. Phase 3 remains open; no Phase 4 work.
+See `tests/session/README.md` for named-disposable-session setup and exact commands.
+Local offline observer/guard tests pass (9 checks), Bash syntax and diff whitespace
+pass. No Docker or live Herdr test has been run here; no dependency installation,
+image changes, staging/commit or host cleanup were performed. Await host results.
+
+### Latest reviewed result: full interactive resume rerun passed and reviewed
+
+The user ran a fresh full test and supplied
+`tests/host/pi-docker-resume.nhtANrCS/`. **The interactive `--resume` gate now
+passes** on Pi 1.5.2/custom image
+`sha256:4fbac6482177e793a7d622c92d11cbdc0dcd3fd3523d63755c440f265bf6623b`.
+All four seeds and all four interactive resumes are verified against raw
+observer/JSONL snapshots: stable ID/file/title/cwd, original plus new user AND
+assistant history, settled stage and no Herdr. Four seed IDs are distinct;
+eight container receipts are distinct. Exact selected-directory/name host
+storage receipts and aggregate evidence agree. Input/driver hashes match;
+saved run/project container queries are empty. Manual observations and yes
+confirmations establish Alpha/Beta local visibility, older Alpha selection,
+Reviewer storage isolation and selected-subdirectory isolation.
+
+Durable sanitized review: `tests/host/interactive-resume-report-pi-1.5.2.txt`.
+The first partial run below remains historical, not a remaining picker failure.
+The copied artifact directories are full deployments; do not stage them wholesale.
+No cleanup or live API requests were performed during review.
+
+**Phase 3 remains open.** Next gates are explicitly consented disposable native
+Herdr restore, base/cross-image continuity and real Docker replacement/layout,
+failure and lifecycle evidence. Do not begin Phase 4 yet or infer consent to live
+Herdr socket exposure. Retain fixtures until separately reviewed cleanup.
+
+### Earlier result: interactive driver supplied, first host run partial
+
+The user requested a file-based workflow instead of copy/paste blocks.
+`tests/host/verify-interactive-resume.sh` now implements the guided host gate;
+usage/scope is documented in `tests/session/README.md`. The user supplied a full
+fixture copy at `tests/host/pi-docker-resume.24uFOGYH/`. Review confirms four
+successful distinct seeds and a successful older Alpha interactive reopen with
+stable ID/file/title/cwd and complete original plus new user/assistant history.
+All copied input hashes and the driver hash match; saved run/project container
+queries are empty. The user reports seeing Alpha and Beta in the picker.
+
+**The full gate did not pass:** `result.txt` records exit 1. The driver stopped on
+an empty Alpha visual observation (`alpha: `), before yes/no confirmation and
+before Beta/Reviewer/Subdirectory picker runs. No final `evidence.json` exists.
+Do not interpret the interruption as an Alpha persistence failure or infer the
+remaining visual/scope checks passed. Durable sanitized review:
+`tests/host/interactive-resume-partial-pi-1.5.2.txt`.
+
+No recovery, rerun or cleanup was performed. Keep the original fixture; obtain
+explicit recovery intent before continuing it. The copied full deployment is raw
+artifact material, not a directory to stage wholesale. Native Herdr,
+base/cross-image, Docker layout-transition/failure gates remain pending.
+The earlier copy/paste handoff below is historical; use the script workflow.
+
+### Earlier request: start with copy/paste scripts for interactive resume
+
+The user has selected **Step 1: validate the real interactive `--resume` picker**
+as the next Phase 3 task. **Start the next session by providing reviewed Bash
+blocks to cut and paste into the host terminal**, followed by short manual TUI
+instructions and evidence checks. Do not start another clipboard investigation
+or substitute a repository-script-only workflow unless the user asks.
+
+Current stopping point:
+
+- The user switched back to branch `worktrees` and reported a clean working
+  tree. Recheck Git status; this handoff itself is a new documentation edit.
+- Interactive test instructions were provided in the conversation, but no setup,
+  seed, picker run or report was confirmed. Treat this gate as **not run**. Do
+  not assume any previous shell variables, temporary fixtures or containers exist.
+- Clipboard copying blocked progress. Pi was launched directly, not through
+  Herdr/tmux. Neither xclip nor wl-copy was present in the container; no display
+  was exposed. A direct host OSC 52 write also failed to populate the clipboard.
+  The host was described as Ubuntu 26.04, “Terminal 50.1”. The exact application
+  was not conclusively identified. The user will fix clipboard access separately.
+- No clipboard package, image, launcher or desktop-socket changes were made.
+  No host test runs, image builds, cleanup or live Herdr operations were performed
+  by the agent during this pause.
+
+Prepare the copy/paste procedure from current source, especially
+`tests/session/README.md`, `tests/session/fixture-provider.ts`,
+`tests/session/compose.fixture.yaml`, `compose.yaml` and `bin/pi`. The existing
+host driver is batch-only and does **not** test the interactive picker. Review
+these requirements when generating the blocks:
+
+1. Run on the supported Linux Docker host, from the checkout root, in Bash and
+   an interactive terminal. State required tools, including test-only jq for the
+   observation checks; do not install dependencies or change image tags silently.
+2. Create a fresh unique `/tmp/pi-docker-resume.XXXXXXXX/` deployment. Copy only
+   allowlisted deployment resources, never real `data/`, `.git/`, `.env`, auth or
+   host Git config. Use empty auth/private settings plus the guarded fixture
+   provider copied into the private config extension directory and its sentinel.
+3. Use a Compose `extends` wrapper over an unchanged copy of production Compose.
+   Preserve the real image entrypoint/command, interactive stdin and TTY. Use
+   network none, temporary HOME/scratch, read-only root, resource bounds and a
+   unique project/run label as in the existing offline test wrapper. Launcher
+   mounts/config/session binds must point only to these fresh fixture resources.
+4. Use the actual copied `bin/pi` with `--no-herdr --no-host-gitconfig`, offline
+   provider/model, tools/MCP/context/resources disabled as appropriate. Let the
+   launcher select custom/base afresh; record selected image ID and input hashes.
+5. Seed Alpha and Beta conversations with different Pi display titles in the
+   same exact project directory and launcher storage name (`backend`). Seed a
+   third conversation under `reviewer` and a fourth under a selected subdirectory.
+   Print mode may seed them; it cannot count as interactive resume evidence.
+6. Launch **without `--print`**, using `--resume`. Inspect the default/local
+   picker list; select the older Alpha rather than just the latest Beta. Verify
+   original history, enter a finite `phase3-*` prompt, wait for its matching
+   `offline-fixture:...` response, then `/quit`. Repeat for Beta, reviewer and
+   the subdirectory. Do not confuse global/all-session browsing with default
+   local storage scoping. Capture any unexpected visibility as a finding.
+7. Save `phase3-result.json` immediately after each seed/run under distinct
+   evidence filenames. Assert stable session ID/file/title/cwd/header cwd,
+   expected user AND assistant history, settled stage and `hasHerdr: false`.
+   Ordinary/subdirectory mounts may both use container `/workspace`; verify
+   directory/name isolation through distinct storage files/IDs, not cwd alone.
+8. Ask for short visual picker/history observations and sanitized saved evidence.
+   Check for retained run-labelled containers. Stop on ambiguous results; no
+   automatic retries, repair, deletion or cleanup. Keep fixtures until reviewed.
+
+This test needs neither a live model provider nor a Herdr session/socket.
+Native restore, base/cross-image continuity, actual Docker layout transitions,
+failure paths and lifecycle semantics remain later gates. Phase 3 remains open.
+
+### Earlier handoff: remaining Phase 3 restore and interactive gates
 
 **Phases 1 and 2 mounting and the first Phase 3 offline persistence host gate
 have passed. Native Herdr restore and the remaining interactive/transition gates
@@ -602,11 +1171,17 @@ inside the container.
 
 **In progress.** The image-independent v3 prerequisite landed in Phase 2. Local
 real-Pi fixture tests and the first offline real-entrypoint host driver are now
-implemented; its real custom-image host report passed all 14 checks. Interactive
-picker, native Herdr, base-image continuity and actual Docker layout-transition
-evidence is still pending. Offline cwd-transition probes now establish an
-upstream continuity limitation, which the user chose to document without policy
-changes. Empty native-restore files are now rejected before container launch.
+implemented; its real custom-image host report passed all 14 checks. The real
+interactive picker gate also passed and was reviewed from rerun `nhtANrCS`:
+Alpha/Beta selection, storage-name/subdirectory isolation and stable history.
+Official native managed-path reopen now also passes for BOTH ordinary and
+linked-subdirectory selections in reviewed shell-boundary run `0rXTuSjw`.
+Automatic restoration after a real Herdr server restart remains untested, as do
+base/cross-image runtime continuity and remaining actual Docker transition,
+native failure-path and integrated lifecycle gates. Offline cwd-transition
+probes establish an upstream continuity limitation, which the user chose to
+document without policy changes. Empty native-restore files are rejected before
+container launch.
 See the handoff and
 `tests/session/README.md`; no Phase 3 completion claim is made.
 
