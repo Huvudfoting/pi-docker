@@ -5,7 +5,6 @@ The real Herdr launch/restart trial still runs on the host.
 """
 
 from concurrent.futures import ThreadPoolExecutor
-import hashlib
 import json
 import os
 from pathlib import Path
@@ -30,7 +29,7 @@ class HerdrLauncherTest(unittest.TestCase):
         self.setup = self.root
         for directory in ['bin', 'lib', 'docs', 'extensions', 'skills', 'images']:
             shutil.copytree(SOURCE / directory, self.root / directory)
-        for filename in ['README.md', 'compose.yaml', 'compose.git.yaml', 'compose.herdr.yaml']:
+        for filename in ['README.md', 'compose.yaml', 'compose.git.yaml', 'compose.herdr.yaml', 'compose.metadata.yaml']:
             shutil.copy2(SOURCE / filename, self.root / filename)
         self.project = self.root / "project with 'quotes'"
         self.project.mkdir()
@@ -46,9 +45,15 @@ class HerdrLauncherTest(unittest.TestCase):
             f"#!{sys.executable}\n"
             "import json, os, sys\n"
             "with open(os.environ['DOCKER_PROBE_LOG'], 'a') as f: f.write(json.dumps(sys.argv[1:]) + '\\n')\n"
-            "if sys.argv[1:3] == ['image', 'inspect']: sys.exit(1 if os.environ.get('MISSING_IMAGE') == sys.argv[3] else 0)\n"
+            "if sys.argv[1:3] == ['image', 'ls']:\n"
+            "    if os.environ.get('LOOKUP_FAILURE'): sys.exit(71)\n"
+            "    if os.environ.get('MISSING_IMAGE') not in ['pi-docker:custom', 'all']: print('pi-docker:custom')\n"
+            "    sys.exit(0)\n"
+            "if sys.argv[1:3] == ['image', 'inspect']: sys.exit(1 if os.environ.get('MISSING_IMAGE') in [sys.argv[3], 'all'] or os.environ.get('INSPECT_FAILURE') else 0)\n"
+            "if sys.argv[1] == 'compose' and sys.argv[-2:] == ['config', '--quiet']: sys.exit(int(os.environ.get('CONFIG_EXIT', '0')))\n"
             "keys = ['PI_WORKSPACE', 'PI_SESSIONS', 'PI_SESSION_TARGET', "
-            "'HERDR_ENV', 'HERDR_PANE_ID', 'HERDR_SOCKET_HOST_PATH', 'HERDR_AGENT', 'PI_GITCONFIG', 'PI_DOCKER_IMAGE']\n"
+            "'HERDR_ENV', 'HERDR_PANE_ID', 'HERDR_SOCKET_HOST_PATH', 'HERDR_AGENT', 'PI_GITCONFIG', 'PI_DOCKER_IMAGE', "
+            "'PI_CHECKOUT_SOURCE', 'PI_CHECKOUT_TARGET', 'PI_WORKDIR', 'PI_GIT_COMMON', 'COMPOSE_FILE', 'COMPOSE_ENV_FILES']\n"
             "with open(os.environ['DOCKER_LOG'], 'w') as f:\n"
             "    json.dump({'args': sys.argv[1:], 'env': {k: os.environ.get(k) for k in keys}}, f)\n"
             "sys.exit(int(os.environ.get('DOCKER_EXIT', '0')))\n"
@@ -155,9 +160,8 @@ class HerdrLauncherTest(unittest.TestCase):
 
     def test_image_selection_and_base_has_no_custom_extension_paths(self):
         for cli, configured, expected in [([], None, 'pi-docker:base'),
-                                           (['--image', 'pi-docker:base'], 'pi-docker:custom', 'pi-docker:base'),
                                            ([], 'pi-docker:custom', 'pi-docker:custom'),
-                                           (['--image', 'registry.example/pi:dev'], 'pi-docker:custom', 'registry.example/pi:dev')]:
+                                           ([], 'invalid inherited image', 'pi-docker:custom')]:
             env = dict(self.env)
             if configured:
                 env['PI_DOCKER_IMAGE'] = configured
@@ -165,20 +169,19 @@ class HerdrLauncherTest(unittest.TestCase):
             result, invocation = self.launch(self.project, '--name', 'backend', '--no-herdr', *cli, env=env)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(invocation['env']['PI_DOCKER_IMAGE'], expected)
-            self.assertEqual(json.loads(self.probes.read_text().splitlines()[-2]), ['image', 'inspect', expected])
+            self.assertIn(['image', 'inspect', expected], [json.loads(line) for line in self.probes.read_text().splitlines()])
             self.assertNotIn('--image', invocation['args'])
             self.assertFalse(any('/usr/local/lib/node_modules/' in a for a in invocation['args']))
             self.assertNotIn('/usr/local/share/pi-custom/skills', invocation['args'])
-        for args in [('--image',), ('--image', ''), ('--image', '--privileged'), ('--image', 'bad image')]:
+        for args in [('--image',), ('--image', ''), ('--image', '--privileged'), ('--image', 'bad image'), ('--image=pi-docker:base',)]:
             result, invocation = self.launch(self.project, '--name', 'backend', *args)
             self.assertEqual(result.returncode, 2, result.stderr)
             self.assertIsNone(invocation)
 
-    def test_available_custom_is_preferred_but_explicit_base_wins(self):
+    def test_available_custom_is_preferred_and_inherited_base_is_ignored(self):
         env = {k: v for k, v in self.env.items() if k != 'MISSING_IMAGE'}
         for cli, configured, expected in [([], None, 'pi-docker:custom'),
-                                           (['--image', 'pi-docker:base'], None, 'pi-docker:base'),
-                                           ([], 'pi-docker:base', 'pi-docker:base')]:
+                                           ([], 'pi-docker:base', 'pi-docker:custom')]:
             selected_env = dict(env)
             if configured:
                 selected_env['PI_DOCKER_IMAGE'] = configured
@@ -191,44 +194,56 @@ class HerdrLauncherTest(unittest.TestCase):
                 self.assertNotIn(['image', 'inspect', 'pi-docker:custom'], probes)
 
     def test_missing_selected_image_fails_before_preparation(self):
-        result, invocation = self.launch(self.other, '--image', 'missing:dev',
-                                         env={**self.env, 'MISSING_IMAGE': 'missing:dev'})
+        result, invocation = self.launch(self.other, env={**self.env, 'MISSING_IMAGE': 'all'})
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIsNone(invocation)
-        self.assertIn('missing:dev', result.stderr)
+        self.assertIn('pi-docker:base', result.stderr)
         self.assertIn('./bin/build custom', result.stderr)
         self.assertEqual(self.herdr_calls(), [])
         self.assertFalse((self.root / 'data/sessions').exists())
         self.assertFalse((self.root / 'data/herdr-launches').exists())
 
-    def test_native_restore_preserves_new_and_legacy_image_records(self):
-        self.env.pop('MISSING_IMAGE')
-        result, original = self.launch(self.project, '--name', 'backend', '--image', 'pi-docker:base', '--herdr')
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(original['env']['PI_DOCKER_IMAGE'], 'pi-docker:base')
+    def test_native_restore_selects_image_afresh_with_image_independent_records(self):
+        original = self.initial_launch()
         filename = 'image-test.jsonl'
-        # Old v1 keys and v2 literal image references must both stay usable.
-        for image in ['pi-docker:custom', 'pi-agent:latest', 'pi-agent:custom', 'pi-agent:personal']:
-            result, selected = self.launch(self.project, '--name', 'backend', '--image', image, '--herdr')
+        (Path(original['env']['PI_SESSIONS']) / filename).touch()
+        reference = f"{original['env']['PI_SESSION_TARGET']}/{filename}"
+        for missing, expected in [('', 'pi-docker:custom'), ('pi-docker:custom', 'pi-docker:base')]:
+            env = {**self.env, 'MISSING_IMAGE': missing, 'PI_DOCKER_IMAGE': 'ignored:preference'}
+            result, restored = self.launch('--session', reference, env=env)
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertNotEqual(original['env']['PI_SESSION_TARGET'], selected['env']['PI_SESSION_TARGET'])
-            if image == 'pi-agent:latest':
-                legacy_key = hashlib.sha256(f'{self.project}\0backend'.encode()).hexdigest()
-                self.assertEqual(selected['env']['PI_SESSION_TARGET'], f'/pi/herdr-sessions/{legacy_key}')
-            (Path(selected['env']['PI_SESSIONS']) / filename).touch()
-            result, restored = self.launch('--session', f"{selected['env']['PI_SESSION_TARGET']}/{filename}",
-                                          env={**self.env, 'PI_DOCKER_IMAGE': 'unrelated:latest'})
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(restored['env']['PI_DOCKER_IMAGE'], image)
-            self.assertEqual(restored['env']['PI_SESSION_TARGET'], selected['env']['PI_SESSION_TARGET'])
-        records = [r.read_bytes() for r in (self.root / 'data/herdr-launches').glob('*.record')]
-        self.assertTrue(any(r.startswith(b'pi-docker-herdr-v1\0') for r in records))
-        self.assertTrue(any(r.endswith(b'pi-agent:custom\0') for r in records))
-        self.assertTrue(any(r.startswith(b'pi-docker-herdr-v2\0') and r.endswith(b'pi-docker:base\0') for r in records))
-        result, restored = self.launch('--session', f"{original['env']['PI_SESSION_TARGET']}/{filename}",
-                                      env={**self.env, 'PI_DOCKER_IMAGE': 'pi-docker:custom'})
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(restored['env']['PI_DOCKER_IMAGE'], 'pi-docker:base')
+            self.assertEqual(restored['env']['PI_DOCKER_IMAGE'], expected)
+            self.assertEqual(restored['env']['PI_SESSION_TARGET'], original['env']['PI_SESSION_TARGET'])
+            self.assertEqual(restored['env']['PI_SESSIONS'], original['env']['PI_SESSIONS'])
+        records = list((self.root / 'data/herdr-launches').glob('*.record'))
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0].read_bytes(), f'pi-docker-herdr-v3\0{self.project}\0backend\0'.encode())
+
+    def test_old_restore_record_versions_are_rejected_without_replacements(self):
+        original = self.initial_launch()
+        record = next((self.root / 'data/herdr-launches').glob('*.record'))
+        for version in ['pi-docker-herdr-v1', 'pi-docker-herdr-v2']:
+            record.write_bytes(f'{version}\0{self.project}\0backend\0pi-docker:base\0'.encode())
+            result, invocation = self.launch('--session', f"{original['env']['PI_SESSION_TARGET']}/old.jsonl")
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertIsNone(invocation)
+            self.assertIn('Unsupported Herdr launch record version', result.stderr)
+
+    def test_lookup_and_inspect_failures_do_not_fall_back(self):
+        for failure in ['LOOKUP_FAILURE', 'INSPECT_FAILURE']:
+            self.probes.unlink(missing_ok=True)
+            result, invocation = self.launch(self.other, env={**self.env, 'MISSING_IMAGE': '', failure: '1'})
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIsNone(invocation)
+            probes = [json.loads(line) for line in self.probes.read_text().splitlines()]
+            self.assertNotIn(['image', 'inspect', 'pi-docker:base'], probes)
+            self.assertEqual(self.herdr_calls(), [])
+
+    def test_compose_validation_failure_prevents_run(self):
+        result, invocation = self.launch(self.other, '--no-herdr', env={**self.env, 'CONFIG_EXIT': '1'})
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIsNone(invocation)
+        self.assertIn('configuration validation failed', result.stderr)
 
     def test_gitconfig_is_optional_read_only_and_can_be_disabled(self):
         config = self.root / '.gitconfig'
@@ -297,7 +312,7 @@ class HerdrLauncherTest(unittest.TestCase):
         self.assertIn("--herdr-status", result.stdout)
         self.assertIn("bin/herdr-extension install", result.stdout)
         self.assertNotIn(str(self.root), result.stdout)
-        self.assertNotRegex(result.stdout, r"(?:^|\s)/[^\s]*")
+        self.assertIn('Ordinary launches retain /workspace', result.stdout)
         result = self.run_command(self.setup / "bin/pi", str(self.project), "--name", "backend", "--herdr-status")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("Official extension: present", result.stdout)
@@ -692,6 +707,361 @@ class HerdrLauncherTest(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("no readable, nonempty extension", result.stderr)
         self.assertIsNone(invocation)
+
+    def fixture_git(self, cwd, *args):
+        return subprocess.run(['git', '-C', str(cwd), '-c', 'core.hooksPath=/dev/null',
+                               '-c', 'commit.gpgSign=false', *args],
+                              env={**self.env, 'GIT_CONFIG_NOSYSTEM': '1', 'GIT_CONFIG_GLOBAL': '/dev/null',
+                                   'GIT_AUTHOR_NAME': 'Fixture', 'GIT_AUTHOR_EMAIL': 'fixture@example.invalid',
+                                   'GIT_COMMITTER_NAME': 'Fixture', 'GIT_COMMITTER_EMAIL': 'fixture@example.invalid'},
+                              check=True, capture_output=True, text=True).stdout.strip()
+
+    def fixture_linked(self):
+        self.fixture_git(self.project, 'init', '-q', '-b', 'main')
+        (self.project / 'tracked').write_text('initial\n')
+        self.fixture_git(self.project, 'add', 'tracked')
+        self.fixture_git(self.project, 'commit', '-qm', 'fixture')
+        linked = self.root / "linked 'quote' $cash:colon"
+        self.fixture_git(self.project, 'worktree', 'add', '-q', '-b', 'helper', str(linked))
+        return linked
+
+    def test_linked_subdirectory_and_symlink_preserve_paths_storage_and_host_metadata(self):
+        linked = self.fixture_linked()
+        selected = linked / 'packages/a/b'
+        selected.mkdir(parents=True)
+        alias = self.root / 'selection-alias'
+        alias.symlink_to(selected)
+        for selection in [selected, alias]:
+            result, invocation = self.launch(selection, '--name', 'backend', '--herdr')
+            self.assertEqual(result.returncode, 0, result.stderr)
+            env = invocation['env']
+            self.assertEqual(env['PI_WORKSPACE'], str(selected))
+            self.assertEqual(env['PI_CHECKOUT_SOURCE'], str(linked))
+            self.assertEqual(env['PI_CHECKOUT_TARGET'], str(linked))
+            self.assertEqual(env['PI_WORKDIR'], str(selected))
+            self.assertEqual(env['PI_GIT_COMMON'], str(self.project / '.git'))
+            self.assertIn(str(self.setup / 'compose.metadata.yaml'), invocation['args'])
+        record = next((self.root / 'data/herdr-launches').glob('*.record')).read_bytes()
+        self.assertIn(str(selected).encode() + b'\0', record)
+        self.assertNotIn(b'image', record)
+        filename = 'linked.jsonl'
+        (Path(env['PI_SESSIONS']) / filename).touch()
+        result, restored = self.launch('--session', f"{env['PI_SESSION_TARGET']}/{filename}")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(restored['env']['PI_WORKDIR'], str(selected))
+        self.assertEqual(restored['env']['PI_CHECKOUT_SOURCE'], str(linked))
+
+    def phase3_managed_selection(self):
+        linked = self.fixture_linked()
+        selected = linked / 'packages/a/b'
+        selected.mkdir(parents=True)
+        result, original = self.launch(selected, '--name', 'backend', '--herdr')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        file = Path(original['env']['PI_SESSIONS']) / 'phase3.jsonl'
+        file.write_text('fixture conversation sentinel\n')
+        reference = f"{original['env']['PI_SESSION_TARGET']}/phase3.jsonl"
+        self.probes.unlink()
+        return linked, selected, file, reference, original
+
+    def test_restore_accepts_current_replacement_checkout_without_historical_type(self):
+        linked, selected, file, reference, original = self.phase3_managed_selection()
+        # Unit-owned fixture only: replace linked layout with a conventional
+        # checkout at the same path. No Git pointer repair or identity registry.
+        shutil.rmtree(linked)
+        selected.mkdir(parents=True)
+        self.fixture_git(linked, 'init', '-q')
+        result, restored = self.launch('--session', reference)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        env = restored['env']
+        self.assertEqual(env['PI_WORKSPACE'], str(selected))
+        self.assertEqual(env['PI_CHECKOUT_SOURCE'], str(selected))
+        self.assertEqual(env['PI_WORKDIR'], '/workspace')
+        self.assertEqual(env['PI_SESSIONS'], original['env']['PI_SESSIONS'])
+        self.assertEqual(env['PI_SESSION_TARGET'], original['env']['PI_SESSION_TARGET'])
+        self.assertNotIn(str(self.setup / 'compose.metadata.yaml'), restored['args'])
+        self.assertEqual(file.read_text(), 'fixture conversation sentinel\n')
+
+    def test_restore_surviving_marker_free_directory_uses_current_ordinary_policy(self):
+        linked, selected, file, reference, original = self.phase3_managed_selection()
+        (linked / '.git').unlink()
+        result, restored = self.launch('--session', reference)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(restored['env']['PI_WORKSPACE'], str(selected))
+        self.assertEqual(restored['env']['PI_WORKDIR'], '/workspace')
+        self.assertEqual(restored['env']['PI_SESSIONS'], original['env']['PI_SESSIONS'])
+        self.assertFalse((linked / '.git').exists())
+        self.assertEqual(file.read_text(), 'fixture conversation sentinel\n')
+
+    def test_restore_invalid_discovered_metadata_fails_before_docker_without_repair(self):
+        linked, selected, file, reference, original = self.phase3_managed_selection()
+        contents = 'gitdir: /nonexistent/phase3-invalid-metadata\n'
+        (linked / '.git').write_text(contents)
+        result, invocation = self.launch('--session', reference)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIsNone(invocation)
+        self.assertFalse(self.probes.exists())
+        self.assertIn('invalid/inaccessible Git metadata', result.stderr)
+        self.assertEqual((linked / '.git').read_text(), contents)
+        self.assertEqual(file.read_text(), 'fixture conversation sentinel\n')
+
+    def test_restore_missing_exact_subdirectory_fails_without_replacement(self):
+        linked, selected, file, reference, original = self.phase3_managed_selection()
+        selected.rmdir()
+        result, invocation = self.launch('--session', reference)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIsNone(invocation)
+        self.assertFalse(self.probes.exists())
+        self.assertIn('Recorded workspace moved or no longer exists', result.stderr)
+        self.assertTrue(linked.is_dir())
+        self.assertFalse(selected.exists())
+        self.assertEqual(file.read_text(), 'fixture conversation sentinel\n')
+
+    def test_continue_and_resume_keep_exact_selected_directory_and_name_scope(self):
+        linked = self.fixture_linked()
+        selected = linked / 'packages/a/b'
+        selected.mkdir(parents=True)
+        seen = set()
+        for directory in [linked, selected]:
+            for name in ['backend', 'reviewer']:
+                for flag in ['--continue', '--resume']:
+                    result, invocation = self.launch(directory, '--name', name, '--herdr', '--', flag)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    env = invocation['env']
+                    current = (env['PI_SESSIONS'], env['PI_SESSION_TARGET'])
+                    self.assertEqual(env['PI_WORKSPACE'], str(directory))
+                    self.assertEqual(env['PI_WORKDIR'], str(directory))
+                    self.assertEqual(invocation['args'][-1], flag)
+                    if flag == '--continue':
+                        self.assertNotIn(current, seen)
+                        seen.add(current)
+                        expected = current
+                    else:
+                        self.assertEqual(current, expected)
+        self.assertEqual(len(seen), 4)
+
+    def test_ordinary_and_self_contained_subdirectories_keep_workspace_layout(self):
+        self.fixture_git(self.project, 'init', '-q')
+        selected = self.project / 'subdir'
+        selected.mkdir()
+        for selection in [selected, self.other]:
+            result, invocation = self.launch(selection, '--no-herdr')
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(invocation['env']['PI_CHECKOUT_SOURCE'], str(selection))
+            self.assertEqual(invocation['env']['PI_CHECKOUT_TARGET'], '/workspace')
+            self.assertEqual(invocation['env']['PI_WORKDIR'], '/workspace')
+            self.assertNotIn(str(self.setup / 'compose.metadata.yaml'), invocation['args'])
+
+    def test_separate_metadata_containment_and_direct_dotgit_symlink(self):
+        for contained in [False, True]:
+            checkout = self.root / ('contained' if contained else 'separate')
+            checkout.mkdir()
+            metadata = checkout / 'metadata' if contained else self.root / 'external metadata'
+            self.fixture_git(checkout, 'init', '-q', '--separate-git-dir', str(metadata))
+            for symlink in [False, True]:
+                if symlink:
+                    (checkout / '.git').unlink()
+                    (checkout / '.git').symlink_to(metadata)
+                result, invocation = self.launch(checkout, '--no-herdr')
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(invocation['env']['PI_CHECKOUT_SOURCE'], str(checkout))
+                self.assertEqual(invocation['env']['PI_GIT_COMMON'], str(metadata))
+                self.assertEqual(str(self.setup / 'compose.metadata.yaml') in invocation['args'], not contained)
+
+    def test_invalid_git_marker_and_control_paths_fail_before_docker(self):
+        (self.project / '.git').write_text('gitdir: /nonexistent/metadata\n')
+        selected = self.project / 'a/b/c/d'
+        selected.mkdir(parents=True)
+        for path in [selected, str(self.project) + '\n']:
+            result, invocation = self.launch(path, '--no-herdr')
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIsNone(invocation)
+            self.assertFalse(self.probes.exists())
+        (self.project / '.git').unlink()
+        (self.project / '.git').symlink_to('/nonexistent/dangling-metadata')
+        result, invocation = self.launch(selected, '--no-herdr')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIsNone(invocation)
+        self.assertFalse(self.probes.exists())
+
+    def test_deployment_control_path_cannot_select_a_sibling_deployment(self):
+        unusual = self.root / 'deployment\n'
+        (unusual / 'bin').mkdir(parents=True)
+        shutil.copy2(self.setup / 'bin/pi', unusual / 'bin/pi')
+        # The old dirname command substitution could strip the newline and
+        # source this different sibling's helpers before showing help.
+        shutil.copytree(self.setup / 'lib', self.root / 'deployment/lib')
+        result = self.run_command(unusual / 'bin/pi', '--help')
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn('Control characters in deployment path', result.stderr)
+        self.assertFalse(self.probes.exists())
+
+    def test_control_character_socket_path_cannot_select_a_different_socket(self):
+        unusual = self.make_socket('herdr.sock\n')
+        result, invocation = self.launch(self.project, '--name', 'backend', '--herdr',
+                                         env={**self.env, 'HERDR_SOCKET_PATH': str(unusual)})
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIsNone(invocation)
+        self.assertIn('Cannot safely resolve HERDR_SOCKET_PATH', result.stderr)
+        self.assertFalse((self.root / 'data/herdr-launches').exists())
+
+    def test_restore_control_alias_is_rejected_as_a_changed_workspace(self):
+        original = self.initial_launch()
+        unusual = self.project.with_name(self.project.name + '\n')
+        self.project.rename(unusual)
+        self.project.symlink_to(unusual)
+        self.probes.unlink()
+        reference = f"{original['env']['PI_SESSION_TARGET']}/restored.jsonl"
+        result, invocation = self.launch('--session', reference)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIsNone(invocation)
+        self.assertIn('Recorded workspace moved or no longer exists', result.stderr)
+        self.assertFalse(self.probes.exists())
+
+    def test_multiline_gitfile_cannot_hide_an_unmounted_traversal(self):
+        checkout = self.root / 'multiline-checkout'
+        checkout.mkdir()
+        metadata = self.root / 'metadata'
+        self.fixture_git(checkout, 'init', '-q', '--separate-git-dir', str(metadata))
+        # The first line alone names the represented metadata, but Git reads
+        # the entire path through a different, unmounted newline-bearing dir.
+        detour = self.root / 'metadata\n'
+        detour.mkdir()
+        contents = f'gitdir: {detour}/../metadata\n'.encode()
+        (checkout / '.git').write_bytes(contents)
+        self.assertEqual(self.fixture_git(checkout, 'rev-parse', '--absolute-git-dir'), str(metadata))
+        result, invocation = self.launch(checkout, '--no-herdr')
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIsNone(invocation)
+        self.assertFalse(self.probes.exists())
+        self.assertIn('control-character/multiline', result.stderr)
+        self.assertEqual((checkout / '.git').read_bytes(), contents)
+
+    def test_git_pointer_files_reject_nul_and_additional_lines_without_mutation(self):
+        linked = self.fixture_linked()
+        admin = Path(self.fixture_git(linked, 'rev-parse', '--absolute-git-dir'))
+        for pointer in [linked / '.git', admin / 'commondir', admin / 'gitdir']:
+            original = pointer.read_bytes()
+            for suffix in [b'\x00ignored', b'\n']:
+                with self.subTest(pointer=pointer.name, suffix=suffix):
+                    contents = original + suffix
+                    pointer.write_bytes(contents)
+                    result, invocation = self.launch(linked, '--name', 'backend', '--no-herdr')
+                    self.assertEqual(result.returncode, 2, result.stderr)
+                    self.assertIsNone(invocation)
+                    self.assertFalse(self.probes.exists())
+                    self.assertEqual(pointer.read_bytes(), contents)
+                    pointer.write_bytes(original)
+
+    def test_pointer_files_accept_single_line_without_a_final_lf(self):
+        linked = self.fixture_linked()
+        admin = Path(self.fixture_git(linked, 'rev-parse', '--absolute-git-dir'))
+        pointers = [linked / '.git', admin / 'commondir', admin / 'gitdir']
+        contents = {path: path.read_bytes().rstrip(b'\n') for path in pointers}
+        for path, body in contents.items():
+            path.write_bytes(body)
+        result, invocation = self.launch(linked, '--name', 'backend', '--no-herdr')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(invocation['env']['PI_WORKDIR'], str(linked))
+        for path, body in contents.items():
+            self.assertEqual(path.read_bytes(), body)
+
+    def test_administrative_pointer_files_cannot_hide_external_symlinks(self):
+        linked = self.fixture_linked()
+        admin = Path(self.fixture_git(linked, 'rev-parse', '--absolute-git-dir'))
+        for name in ['commondir', 'gitdir']:
+            with self.subTest(pointer=name):
+                pointer = admin / name
+                contents = pointer.read_bytes()
+                external = self.root / f'external-{name}'
+                external.write_bytes(contents)
+                pointer.unlink()
+                pointer.symlink_to(external)
+                self.assertEqual(self.fixture_git(linked, 'rev-parse', '--is-inside-work-tree'), 'true')
+                result, invocation = self.launch(linked, '--name', 'backend', '--no-herdr')
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIsNone(invocation)
+                self.assertFalse(self.probes.exists())
+                self.assertIn('symlink alias', result.stderr)
+                pointer.unlink()
+                pointer.write_bytes(contents)
+
+    def test_dotgit_readlink_control_characters_are_not_stripped_into_another_target(self):
+        checkout = self.root / 'symlink-checkout'
+        checkout.mkdir()
+        metadata = self.root / 'metadata'
+        self.fixture_git(checkout, 'init', '-q', '--separate-git-dir', str(metadata))
+        (metadata / 'alias').mkdir()
+        unusual_alias = metadata / 'alias\n'
+        unusual_alias.symlink_to(metadata)
+        (checkout / '.git').unlink()
+        (checkout / '.git').symlink_to(unusual_alias)
+        self.assertEqual(self.fixture_git(checkout, 'rev-parse', '--absolute-git-dir'), str(metadata))
+        result, invocation = self.launch(checkout, '--no-herdr')
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIsNone(invocation)
+        self.assertFalse(self.probes.exists())
+        self.assertIn('control characters', result.stderr)
+
+    def test_unmounted_non_symlink_pointer_detour_is_rejected_before_docker(self):
+        linked = self.fixture_linked()
+        admin = Path(self.fixture_git(linked, 'rev-parse', '--absolute-git-dir'))
+        detour = self.root / 'unmounted-detour'
+        detour.mkdir()
+        (linked / '.git').write_text(f'gitdir: {detour}/../{admin.relative_to(self.root)}\n')
+        # Git accepts the host layout, but the detour directory would not exist
+        # in the container even though normalized/canonical endpoints agree.
+        self.assertEqual(self.fixture_git(linked, 'rev-parse', '--absolute-git-dir'), str(admin))
+        result, invocation = self.launch(linked, '--name', 'backend', '--no-herdr')
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIsNone(invocation)
+        self.assertFalse(self.probes.exists())
+        self.assertIn('unrepresented traversal directory', result.stderr)
+
+    def test_canonical_control_character_path_cannot_alias_a_different_directory(self):
+        normal = self.root / 'canonical'
+        normal.mkdir()
+        unusual = self.root / 'canonical\n'
+        unusual.mkdir()
+        alias = self.root / 'clean-selection'
+        alias.symlink_to(unusual)
+        result, invocation = self.launch(alias, '--no-herdr')
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIsNone(invocation)
+        self.assertFalse(self.probes.exists())
+        self.assertIn('control characters', result.stderr)
+
+    def test_inherited_git_and_compose_overrides_do_not_redirect_selection(self):
+        self.fixture_linked()
+        result, invocation = self.launch(self.other, '--no-herdr', env={**self.env,
+            'GIT_DIR': str(self.project / '.git'), 'GIT_WORK_TREE': str(self.project),
+            'GIT_CONFIG_COUNT': '999', 'COMPOSE_FILE': '/untrusted/compose.yaml',
+            'COMPOSE_ENV_FILES': '/untrusted/settings'})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(invocation['env']['PI_CHECKOUT_SOURCE'], str(self.other))
+        self.assertEqual(invocation['env']['PI_WORKDIR'], '/workspace')
+        self.assertIsNone(invocation['env']['COMPOSE_FILE'])
+        self.assertIsNone(invocation['env']['COMPOSE_ENV_FILES'])
+        self.assertIn('/dev/null', invocation['args'])
+        self.assertIn('--pull', invocation['args'])
+
+    def test_no_git_allows_only_marker_free_launch_and_diagnostics_still_work(self):
+        tools = self.root / 'without-git'
+        tools.mkdir()
+        for name in ['bash', 'realpath', 'dirname', 'basename', 'sha256sum', 'cut', 'id', 'mkdir', 'env', 'uname']:
+            (tools / name).symlink_to(shutil.which(name))
+        env = {**self.env, 'PATH': f'{self.bin}:{tools}'}
+        result, invocation = self.launch(self.other, '--no-herdr', env=env)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.probes.unlink()
+        (self.project / '.git').symlink_to('/nonexistent/metadata')
+        result, invocation = self.launch(self.project, '--name', 'backend', '--no-herdr', env=env)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn('host Git required', result.stderr)
+        self.assertIsNone(invocation)
+        self.assertFalse(self.probes.exists())
+        result = self.run_command(self.setup / 'bin/pi', str(self.project), '--name', 'backend', '--herdr-status', env=env)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(self.probes.exists())
 
 
 if __name__ == "__main__":

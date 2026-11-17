@@ -20,11 +20,16 @@ pi ~/repos/project
 Inside Pi, use `/login` and `/model`. Model APIs must already be running and
 reachable; this project does not manage model servers.
 
-Without `--image` or `PI_DOCKER_IMAGE`, the launcher prefers local
-`pi-docker:custom`, otherwise `pi-docker:base`. See [usage](docs/USAGE.md#launching)
-for image-selection options. Base includes Pi, Node.js, and
+Every launch/helper/restore prefers local `pi-docker:custom`, otherwise
+`pi-docker:base`. Image overrides and recorded image replay are unsupported;
+see [usage](docs/USAGE.md#launching). Base includes Pi, Node.js, and
 Herdr/GitHub tooling; custom adds Python, uv, nano, and optional extensions.
 See [image customization](docs/CUSTOMIZATION.md#two-images).
+
+Existing linked worktrees use path-preserving checkout/Git-metadata mounts;
+ordinary directories keep `/workspace`. Host Git is required for Git-marked
+selections, but not marker-free ordinary directories. See
+[mount policy](docs/SETUP.md#worktree-mount-policy).
 
 **Security:** This is not a hardened sandbox. Containers can write the project
 and read mounted credentials; networking is shared with the host. Eligible
@@ -55,4 +60,5 @@ Run offline checks with Python 3 and Node.js; no live Docker or Herdr is needed:
 python3 -m unittest discover -s tests -p 'test_*.py'
 ```
 
-Adapter tests skip without Node.js. Neither runtime is needed on the host to launch Pi.
+Adapter tests skip without Node.js; Herdr contract-harness tests need test-only
+`jq`. Neither Python nor Node is needed on the host to launch Pi.

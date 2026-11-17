@@ -102,27 +102,24 @@ class HelperTest(unittest.TestCase):
                      self.env['PI_DOCKER_HOST_WORKSPACE'], '--no-focus']])
                 self.assertEqual(calls[3], ['agent', 'start', 'helper', '--kind', 'pi', '--pane', 'w1:p2',
                                            '--timeout', '120000', '--', self.env['PI_DOCKER_HOST_WORKSPACE'],
-                                           '--name', 'helper', '--image', 'pi-docker:base', '--herdr'])
+                                           '--name', 'helper', '--herdr'])
                 self.assertEqual(calls[4], ['agent', 'get', 'w1:p2'])
 
-    def test_helper_preserves_selected_image_and_rejects_invalid_image_before_split(self):
-        code, r, calls = self.launch(self.start_steps(), 'start', '--name', 'helper',
-                                     env={**self.env, 'PI_DOCKER_IMAGE': 'registry.example/dev/pi:custom'})
-        self.assertEqual(code, 0, r)
-        self.assertEqual(r['image'], 'registry.example/dev/pi:custom')
-        self.assertEqual(calls[3][-3:], ['--image', 'registry.example/dev/pi:custom', '--herdr'])
-        for image in ['--privileged', 'bad image', 'image\n']:
-            code, r, calls = self.launch([], 'start', '--name', 'helper',
+    def test_helper_ignores_inherited_images_and_never_forwards_or_records_them(self):
+        for image in ['registry.example/dev/pi:custom', '--privileged', 'bad image', 'image\n']:
+            code, r, calls = self.launch(self.start_steps(), 'start', '--name', 'helper',
                                          env={**self.env, 'PI_DOCKER_IMAGE': image})
-            self.assertEqual(code, 2, r)
-            self.assertEqual(calls, [])
+            self.assertEqual(code, 0, r)
+            self.assertNotIn('image', r)
+            self.assertNotIn('--image', calls[3])
+            self.assertEqual(calls[3][-3:], ['--name', 'helper', '--herdr'])
 
-    def test_helper_without_image_metadata_uses_current_base_tag(self):
+    def test_helper_without_image_metadata_delegates_selection_to_host(self):
         env = {key: value for key, value in self.env.items() if key != 'PI_DOCKER_IMAGE'}
         code, r, calls = self.launch(self.start_steps(), 'start', '--name', 'helper', env=env)
         self.assertEqual(code, 0, r)
-        self.assertEqual(r['image'], 'pi-docker:base')
-        self.assertEqual(calls[3][-3:], ['--image', 'pi-docker:base', '--herdr'])
+        self.assertNotIn('image', r)
+        self.assertEqual(calls[3][-3:], ['--name', 'helper', '--herdr'])
 
     def test_explicit_direction_skips_geometry(self):
         steps = self.start_steps(); del steps[1]

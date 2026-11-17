@@ -19,7 +19,7 @@ class LayoutTest(unittest.TestCase):
         self.assertNotIn('EDITOR:', compose)
         self.assertNotIn('VISUAL:', compose)
         expected = ['bin', 'lib', 'docs', 'extensions', 'skills', 'images', 'README.md',
-                    'compose.yaml', 'compose.git.yaml', 'compose.herdr.yaml']
+                    'compose.yaml', 'compose.git.yaml', 'compose.herdr.yaml', 'compose.metadata.yaml']
         self.assertTrue(compose.startswith('x-readonly-bind: &readonly-bind\n'
                                            '  type: bind\n  read_only: true\n'
                                            '  bind:\n    create_host_path: false\n\n'))
@@ -28,7 +28,15 @@ class LayoutTest(unittest.TestCase):
         self.assertEqual(mounts, [('"${GH_CONFIG:?}"', '/run/gh-config'),
                                  *[(f'./{p}', f'/opt/pi-docker/{p}') for p in expected]])
         # Every long-form mount must use the shared options with no overrides.
-        self.assertEqual(compose.count('      - {'), len(mounts))
+        self.assertEqual(compose.count('      - {'), len(mounts) + 3)
+        self.assertEqual(compose.count('<<: *writable-bind'), 3)
+        self.assertIn('    working_dir: "${PI_WORKDIR:?}"', compose)
+        self.assertIn('source: "${PI_CHECKOUT_SOURCE:?}", target: "${PI_CHECKOUT_TARGET:?}"', compose)
+        self.assertNotIn(':/workspace', compose)
+        self.assertEqual(compose.count('PI_DOCKER_IMAGE'), 1)  # Compose image input only; not forwarded
+        metadata = (ROOT / 'compose.metadata.yaml').read_text()
+        self.assertIn('create_host_path: false', metadata)
+        self.assertIn('target: "${PI_GIT_COMMON:?}"', metadata)
         self.assertNotIn('      - type:', compose)
         for source, target in mounts[1:]:
             self.assertTrue((ROOT / source).exists())

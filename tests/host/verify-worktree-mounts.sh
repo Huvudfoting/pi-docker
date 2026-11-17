@@ -6,7 +6,8 @@ here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 source "$here/mount-contract.sh"
 source "$here/container-command.sh"
 usage() {
-  printf '%s\n' 'Usage: bash tests/host/verify-worktree-mounts.sh --preflight|--run' \
+  printf '%s\n' 'Usage: bash tests/host/verify-worktree-mounts.sh --preflight|--run|--production-preflight|--production-run' \
+    '  --production-preflight / --production-run: use production discovery and deployment Compose with isolated fixture private binds.' \
     '  --preflight  Read-only tool/daemon/local-image checks; creates no files or containers.' \
     '  --run        Create disposable fixtures and run isolated container tests.' \
     'No real configuration, credentials, sessions, or Herdr socket are mounted.' \
@@ -47,21 +48,34 @@ preflight() {
   printf 'Image: %s\nImage ID: %s\nDocker endpoint: local Unix socket\n' "$selected_tag" "$selected_id"
   printf 'Preflight passed. No containers or test files created by preflight.\n'
 }
-case "${1:-}" in
+production=0; mode="${1:-}"
+case "$mode" in
   --help|-h) usage; exit 0 ;;
   --preflight|--run) [[ $# == 1 ]] || { usage; exit 2; } ;;
+  --production-preflight|--production-run)
+    [[ $# == 1 ]] || { usage; exit 2; }
+    production=1; mode="--${mode#--production-}"
+    source "$here/production-mount-contract.sh" ;;
   *) usage; exit 2 ;;
 esac
 preflight
-[[ "$1" == --run ]] || exit 0
-root="$(mktemp -d /tmp/pi-docker-mount.XXXXXXXX)"
+[[ "$mode" == --run ]] || exit 0
+prefix=pi-docker-mount
+if ((production)); then prefix=pi-docker-production; fi
+root="$(mktemp -d "/tmp/$prefix.XXXXXXXX")"
 root="$(realpath -e -- "$root")"
 fixtures="$root/fixtures"; mkdir "$fixtures" "$root/logs"
 project="pimount-$(basename -- "$root" | tr '[:upper:].' '[:lower:]-')"
 report="$root/report.txt"
 case_number=0; passed=0
-printf 'Standalone worktree mount-contract report\nImage: %s\nImage ID: %s\n' "$selected_tag" "$selected_id" > "$report"
-printf 'Scope: experimental helper/static Compose, NOT production launcher or Herdr.\n' >> "$report"
+title='Standalone worktree mount-contract report'
+if ((production)); then title='Production Compose worktree mount-contract report'; fi
+printf '%s\nImage: %s\nImage ID: %s\n' "$title" "$selected_tag" "$selected_id" > "$report"
+if ((production)); then
+  printf 'Scope: production discovery and deployment Compose plus isolated Node test overrides; NOT Pi startup/Herdr/restore/rewind.\n' >> "$report"
+else
+  printf 'Scope: experimental helper/static Compose, NOT production launcher or Herdr.\n' >> "$report"
+fi
 printf 'Git: %s\nBash: %s\nCompose: %s\nDocker: %s\n' "$(git --version)" "$BASH_VERSION" "$compose_version" "$docker_versions" >> "$report"
 finish() {
   local rc=$?
@@ -101,18 +115,38 @@ export PROBE_IMAGE_ID="$selected_id" PROBE_UID="$(id -u)" PROBE_GID="$(id -g)" P
 export GIT_AUTHOR_NAME=Fixture GIT_AUTHOR_EMAIL=fixture@example.invalid
 export GIT_COMMITTER_NAME=Fixture GIT_COMMITTER_EMAIL=fixture@example.invalid
 export PROBE_MAIN_SENTINEL='' PROBE_BARRIER='' PROBE_PARTICIPANT=''
+if ((production)); then
+  compose_directory="$(realpath -e -- "$here/../..")"; probe_service=pi
+  export PROBE_FIXTURES="$fixtures" PROBE_DEPLOYMENT="$compose_directory"
+  export PI_CONFIG="$fixtures/config" PI_SESSIONS="$fixtures/sessions" GH_CONFIG="$fixtures/gh-config"
+  export PI_SESSION_TARGET=/pi/sessions PI_UID="$PROBE_UID" PI_GID="$PROBE_GID"
+  export PI_GITCONFIG="$fixtures/gitconfig" PI_DOCKER_IMAGE="$selected_id"
+  export PROBE_EFFECTIVE="$root/effective-placeholder.json"
+  : > "$PROBE_EFFECTIVE"
+  mkdir "$PI_CONFIG" "$PI_SESSIONS" "$GH_CONFIG"
+  for private in "$PI_CONFIG" "$PI_SESSIONS" "$GH_CONFIG"; do printf 'mount fixture\n' > "$private/fixture-marker"; done
+  printf '# mount fixture\n' > "$PI_GITCONFIG"
+fi
 configure() {
   probe_discover "$1" || return
   export PROBE_CHECKOUT="$probe_checkout" PROBE_TARGET="$probe_target" PROBE_WORKDIR="$probe_workdir"
   export PROBE_COMMON="$probe_common" PROBE_METADATA="$probe_metadata" PROBE_KIND="$probe_kind"
   export PROBE_ACTION="${2:-inspect}"
-  compose_files=(-f "$here/compose.probe.yaml")
-  if ((probe_metadata)); then compose_files+=(-f "$here/compose.metadata.yaml"); fi
+  if ((production)); then
+    export PI_WORKSPACE="$probe_selected" PI_CHECKOUT_SOURCE="$probe_checkout" PI_CHECKOUT_TARGET="$probe_target"
+    export PI_WORKDIR="$probe_workdir" PI_GIT_COMMON="$probe_common"
+    compose_files=(-f "$compose_directory/compose.yaml" -f "$compose_directory/compose.git.yaml")
+    if ((probe_metadata)); then compose_files+=(-f "$compose_directory/compose.metadata.yaml"); fi
+    compose_files+=(-f "$here/compose.production-probe.yaml")
+  else
+    compose_files=(-f "$here/compose.probe.yaml")
+    if ((probe_metadata)); then compose_files+=(-f "$here/compose.metadata.yaml"); fi
+  fi
 }
 compose() {
   env -u COMPOSE_FILE -u COMPOSE_ENV_FILES -u COMPOSE_PROJECT_NAME -u COMPOSE_PROFILES \
     -u COMPOSE_PATH_SEPARATOR COMPOSE_DISABLE_ENV_FILE=1 \
-    docker compose --env-file /dev/null --project-directory "$fixtures" -p "$project" "${compose_files[@]}" "$@"
+    docker compose --env-file /dev/null --project-directory "${compose_directory:-$fixtures}" -p "$project" "${compose_files[@]}" "$@"
 }
 init_repo() {
   mkdir -p "$1"
@@ -150,6 +184,9 @@ concurrent_writes() {
     printf 'Concurrent outcomes: a=%s b=%s; inspect names, do not retry\n' "$rc_a" "$rc_b"; return 1;
   }
 }
+if ((production)); then
+  export MOUNT_CONTRACT_IMPL="$here/production-mount-contract.sh"
+fi
 step 'offline Bash/Git contract checks' bash "$here/test-mount-contract.sh"
 mkdir "$fixtures/ordinary directory"
 configure "$fixtures/ordinary directory"
@@ -223,5 +260,9 @@ export PROBE_COMMON="$fixtures/metadata-that-does-not-exist"
 step 'missing metadata bind source fails closed' expect_missing_source "$PROBE_COMMON"
 step 'container exits left linked worktree intact' test -f "$a/.git"
 step 'container exits left separate checkout and direct .git symlink intact' test -d "$separate/.git"
-printf '\nNot tested: production launcher merge, Herdr mutations, conversations, restore, rewind.\n' >> "$report"
+if ((production)); then
+  printf '\nNot tested: actual Pi startup, Herdr overlay/socket/API, conversations, restore, rewind, or an independent base-image run.\n' >> "$report"
+else
+  printf '\nNot tested: production launcher merge, Herdr mutations, conversations, restore, rewind.\n' >> "$report"
+fi
 printf 'These remain separate integration stages.\n' >> "$report"

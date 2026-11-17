@@ -12,13 +12,15 @@ Commands run on the **host from the repository root** unless marked otherwise.
 ```bash
 ./bin/build
 ./bin/build custom  # requires local base
-pi ~/repos/project --image pi-docker:custom
+pi ~/repos/project  # automatically prefers local custom
 ```
 
 For launch selection and defaults, see [usage](USAGE.md#launching).
-The launcher checks availability but does not build or pull images. Helpers
-preserve the selection; native restore uses the recorded image. Rebuilt tags
-affect future containers; use a versioned tag or digest when a fixed image matters.
+The launcher checks availability but does not build or pull images. Launches,
+helpers and native restore each select local custom if available, otherwise base;
+no caller choice or historical image is replayed. `--image` is unsupported and
+inherited `PI_DOCKER_IMAGE` is ignored. Rebuilt tags affect future containers;
+configuration and conversation identity do not depend on the chosen image.
 
 ## Customize the example
 
@@ -39,7 +41,7 @@ load a Pi extension.
 
 ```bash
 ./bin/build custom --tag my-pi:dev
-pi ~/repos/project --image my-pi:dev
+pi ~/repos/project  # build also refreshed the standard pi-docker:custom tag
 ```
 
 This also tags the result `pi-docker:custom`. To use another locally available
@@ -53,7 +55,8 @@ Build/pull that base explicitly first. The wrapper inspects it and owns
 `BASE_IMAGE`; forwarded `--build-arg BASE_IMAGE=...` cannot override it. Other
 Docker options are forwarded except `--pull`/`--pull=...`, which custom rejects.
 A separate downstream Dockerfile can use `FROM pi-docker:base` and the same
-entrypoint pattern—no launcher fork. Preserve Pi-argument forwarding,
+entrypoint pattern; tag its reviewed result `pi-docker:custom` for automatic
+launcher selection. Arbitrary launch-time image tags are unsupported. Preserve Pi-argument forwarding,
 `/home/node`, and base integration tools/paths.
 
 ### Python and editor tooling
@@ -85,7 +88,7 @@ The required Herdr reporter is separate and host-managed; see
 | `data/config/settings.json`, `AGENTS.md` | `/pi/agent/` | Shared settings/instructions |
 | `data/config/extensions/`, `data/config/skills/` | `/pi/agent/extensions/`, `/pi/agent/skills/` | Shared discovery |
 | `extensions/` | `/opt/pi-docker/extensions/` | Common launcher; read-only |
-| `<project>/.pi/` | `/workspace/.pi/` | Project settings/extensions/skills; subject to Pi trust |
+| `<project>/.pi/` | Under actual project path (`/workspace` for ordinary launches) | Project settings/extensions/skills; subject to Pi trust |
 | `images/custom/AGENTS.md`, `images/custom/skills/` | `/usr/local/share/pi-custom/` | Baked into custom; image entrypoint loads them |
 
 `PI_CODING_AGENT_DIR=/pi/agent` replaces Pi's default `~/.pi/agent`.

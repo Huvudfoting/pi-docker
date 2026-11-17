@@ -2,23 +2,26 @@
 set -euo pipefail
 
 # Resolve this deployment through symlinks, independently of the workspace.
-script="$(realpath -- "${BASH_SOURCE[0]}")"
+# Bootstrap before the source-only path helpers are available. Preserve the
+# path's final bytes so a newline cannot silently select a sibling deployment.
+script="$(realpath -- "${BASH_SOURCE[0]}" && printf '.')" || exit 2
+script="${script%.}"; script="${script%$'\n'}"
+[[ "$script" != *[[:cntrl:]]* ]] || { printf 'pi-docker: Control characters in deployment path are unsupported\n' >&2; exit 2; }
 root="$(dirname -- "$(dirname -- "$script")")"
 
 fail() { printf 'pi-docker: %s\n' "$*" >&2; exit 2; }
 
 # Herdr details live separately; sourcing the helper creates no persistent state.
 source "$root/lib/herdr-launch.sh"
+source "$root/lib/workspace-mounts.sh"
 
 show_help() {
-  printf '%s\n' 'Usage: pi [workspace] [--name NAME] [--image IMAGE] [--no-host-gitconfig] [--herdr|--no-herdr] [-- PI_ARGS...]
+  printf '%s\n' 'Usage: pi [workspace] [--name NAME] [--no-host-gitconfig] [--herdr|--no-herdr] [-- PI_ARGS...]
        pi [workspace] [--name NAME] --herdr-status
        pi --session <managed-session-path>  (native Herdr restore)
 
 Docker-Pi launcher options (before Pi arguments):
   --name NAME       Select session storage, not the conversation title.
-  --image IMAGE     Override PI_DOCKER_IMAGE; otherwise prefer local custom, then base.
-                    Use --image pi-docker:base to force the base image.
   --no-host-gitconfig  Do not mount the host ~/.gitconfig.
   --herdr           Require Herdr reporting and native restore (local Linux).
   --no-herdr        Disable detection, installation, and Herdr socket exposure.
@@ -27,6 +30,11 @@ Docker-Pi launcher options (before Pi arguments):
   --               Forward remaining arguments to Pi; e.g. pi -- --help.
 
 Workspace defaults to the current directory; an explicit workspace comes first.
+Linked/external-metadata checkouts use host-path-preserving binds and the exact
+selected-directory cwd. Ordinary launches retain /workspace. Host Git is required
+for enclosing .git markers, not for successfully inspected ordinary directories.
+Every launch selects local pi-docker:custom if present, otherwise pi-docker:base.
+--image is no longer supported; inherited PI_DOCKER_IMAGE is ignored.
 Interactive launches auto-enable Herdr in a detected local Linux Herdr pane.
 Herdr mode requires terminal stdin/stdout and a same-user Unix socket; the
 launcher ensures the official extension is current using host Herdr. It grants
@@ -34,8 +42,8 @@ access to the full Herdr API. Auto preparation failures warn and launch without
 integration; explicit --herdr and native restore fail instead.
 Use --continue or --resume for existing sessions. Herdr mode rejects headless
 modes, custom session paths/directories, --no-session, and --no-extensions.
-The selected image is preserved for helpers and native restore; other original
-CLI flags are not replayed on restore. Questionnaire blocked events
+Helpers and native restore select the image afresh; original CLI flags are
+not replayed on restore. Questionnaire blocked events
 are not yet bridged; socket replacement recovery is not guaranteed.
 
 Install/update the official extension on the host, from the docker-pi repo root:
@@ -49,7 +57,6 @@ parse_arguments() {
     [[ $# == 2 ]] || fail "Managed restore accepts only: pi --session <managed-path>"
     herdr_mode=required
     herdr_load_restore "$2"
-    auto_image=0
     pi_args=("$@")
     return
   fi
@@ -64,11 +71,8 @@ parse_arguments() {
         [[ $# -ge 2 ]] || fail "--name needs a value"
         name="$2"
         shift 2 ;;
-      --image)
-        [[ $# -ge 2 && -n "$2" ]] || fail "--image needs a nonempty value"
-        image="$2"
-        auto_image=0
-        shift 2 ;;
+      --image|--image=*)
+        fail "--image is no longer supported; each launch selects local custom if available, otherwise base" ;;
       --herdr|--no-herdr)
         [[ "$herdr_mode" == auto ]] || fail "Choose only one of --herdr and --no-herdr"
         if [[ "$1" == --herdr ]]; then herdr_mode=required; else herdr_mode=disabled; fi
@@ -84,12 +88,11 @@ parse_arguments() {
 }
 
 resolve_selection() {
-  local resolved hash
-  [[ "$image" =~ ^[a-zA-Z0-9][a-zA-Z0-9._/:@-]*$ ]] \
-    || fail "Invalid image reference: $image"
-  resolved="$(realpath -e -- "$workspace" 2>/dev/null)" \
-    || fail "Workspace does not exist: $workspace. Supply an existing project directory as the first argument."
-  workspace="$resolved"
+  local hash
+  [[ "$workspace" != *[[:cntrl:]]* ]] || fail "Control characters in workspace path are unsupported"
+  mount_capture_path realpath -e -- "$workspace" \
+    || fail "Cannot resolve a safe existing workspace: $workspace. Supply an existing project directory without control characters."
+  workspace="$mount_path_result"
   [[ -d "$workspace" ]] || fail "Not a directory: $workspace"
   [[ -n "$name" ]] || name="$(basename "$workspace")"
   [[ "$name" =~ ^[a-zA-Z0-9_.-]+$ ]] \
@@ -102,14 +105,19 @@ resolve_selection() {
 require_docker() {
   command -v docker >/dev/null 2>&1 \
     || fail "Docker CLI not found. Run this launcher on the host with Docker Engine and the Compose plugin installed."
-  if ((auto_image)) && docker image inspect pi-docker:custom >/dev/null 2>&1; then
-    image=pi-docker:custom
-  fi
+  local tags
+  tags="$(docker image ls --filter reference=pi-docker:custom --format '{{.Repository}}:{{.Tag}}')" || {
+    printf 'pi-docker: Local custom-image lookup failed; check Docker/daemon access (not image absence).\n' >&2
+    exit 1
+  }
+  [[ -z "$tags" || "$tags" == pi-docker:custom ]] || fail "Unexpected custom-image lookup response"
+  image=pi-docker:base
+  [[ "$tags" != pi-docker:custom ]] || image=pi-docker:custom
   if ! docker image inspect "$image" >/dev/null 2>&1; then
     printf 'pi-docker: Cannot inspect image %s. Check Docker access and build the selected image on the host.\n' "$image" >&2
     printf '%s\n' 'Base: ./bin/build' \
       'Custom example (after base): ./bin/build custom' \
-      'Other images: build/tag your derived image, then select it with --image.' >&2
+      'Image selection is automatic; inherited PI_DOCKER_IMAGE and --image are not inputs.' >&2
     exit 1
   fi
 }
@@ -122,6 +130,8 @@ prepare_environment() {
   export PI_CONFIG="$root/data/config"
   export PI_SESSIONS="$session"
   export PI_WORKSPACE="$workspace"
+  export PI_CHECKOUT_SOURCE="$mount_checkout" PI_CHECKOUT_TARGET="$mount_target"
+  export PI_WORKDIR="$mount_workdir" PI_GIT_COMMON="$mount_common"
   export PI_SESSION_TARGET
   export PI_DOCKER_IMAGE="$image"
   export PI_UID="$(id -u)"
@@ -139,7 +149,15 @@ launch_pi() {
       --skill /opt/pi-docker/skills/pi-docker-herdr
     )
   fi
-  exec docker compose "${compose_files[@]}" run --rm pi \
+  # Explicit files/environment: cwd .env and inherited Compose preferences must
+  # not change our mount contract. Long-form binds never create missing sources.
+  local compose=(docker compose "${compose_files[@]}" --env-file /dev/null --project-directory "$root")
+  local clean=(env -u COMPOSE_FILE -u COMPOSE_ENV_FILES -u COMPOSE_PROJECT_NAME -u COMPOSE_PROFILES -u COMPOSE_PATH_SEPARATOR COMPOSE_DISABLE_ENV_FILE=1)
+  "${clean[@]}" "${compose[@]}" config --quiet || {
+    printf 'pi-docker: Effective Compose configuration validation failed; refusing launch.\n' >&2
+    exit 1
+  }
+  exec "${clean[@]}" "${compose[@]}" run --rm --pull never pi \
     --append-system-prompt /opt/pi-docker/docs/AGENTS.md \
     --extension /opt/pi-docker/extensions \
     "${skill_args[@]}" \
@@ -149,9 +167,7 @@ launch_pi() {
 main() {
   # Selection and arguments are shared with the Herdr helper, never re-parsed.
   workspace="$PWD"
-  image="${PI_DOCKER_IMAGE:-pi-docker:base}"
-  auto_image=0
-  [[ -n "${PI_DOCKER_IMAGE:-}" ]] || auto_image=1
+  image='' # A Compose-only result selected afresh; never an inherited input.
   name=""
   herdr=0
   herdr_mode=auto
@@ -171,9 +187,11 @@ main() {
     return
   fi
 
+  mount_discover "$workspace" || fail "Workspace mount discovery failed; no checkout or metadata was changed."
   require_docker
   PI_SESSION_TARGET=/pi/sessions
   compose_files=(-f "$root/compose.yaml")
+  if ((mount_metadata)); then compose_files+=(-f "$root/compose.metadata.yaml"); fi
   if ((host_gitconfig)) && [[ -f "$HOME/.gitconfig" && -r "$HOME/.gitconfig" ]]; then
     export PI_GITCONFIG="$HOME/.gitconfig"
     compose_files+=(-f "$root/compose.git.yaml")

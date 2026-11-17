@@ -1,7 +1,9 @@
 # Pi Docker: container instructions
 
-You are inside Docker, not on the host. Tools run here. `/workspace` is the
-writable project; its host path may differ. `/pi/agent` is shared configuration
+You are inside Docker, not on the host. Tools run here. Use the actual working
+directory: `/workspace` is only the ordinary default. Linked/external-metadata
+checkouts preserve absolute host paths and may start in a selected subdirectory.
+Do not assume the host project path from a container path. `/pi/agent` is shared configuration
 and credentials; conversations use `/pi/sessions` or `/pi/herdr-sessions/<key>`.
 `/opt/pi-docker` is read-only deployment source, possibly newer than the image.
 Docker is unavailable here; builds/container management run on the host.
@@ -23,6 +25,12 @@ Do not search the project for deployment guides:
 - Image resources load through their entrypoint. Shared/project resources can
   load with either image; images do not isolate credentials or checkout writes.
   Avoid concurrent configuration edits; use separate worktrees for writing agents.
+- For helper startup, use the supplied `PI_DOCKER_HOST_WORKSPACE` host selection,
+  not `$PWD` or a guessed checkout root. Images are selected afresh by the host
+  launcher; do not pass `--image` or propagate image preferences.
+- Be aware: All agents working on the same repository share read/write access
+  to its Git metadata, including objects, refs, and configuration, even when
+  working in different worktrees. Do not remove or repair worktrees implicitly.
 - Do not inspect/disclose credentials or real environment files during routine
   work. Read-only mounts prevent modification, not disclosure or remote writes.
 - Use `gh` for GitHub operations, repositories as `OWNER/REPO`, and `--help` when

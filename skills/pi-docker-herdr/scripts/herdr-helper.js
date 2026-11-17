@@ -195,9 +195,6 @@ class Workflow {
       if (!path.isAbsolute(root) || /[\x00-\x1f\x7f]/.test(root))
         this.fail("invalid_host_workspace", "requires absolute PI_DOCKER_HOST_WORKSPACE; start a fresh integrated container");
       if (!matches(NAME, this.args.name)) this.fail("invalid_input", "name must match [a-z][a-z0-9_-]{0,31}");
-      this.image = env.PI_DOCKER_IMAGE || "pi-docker:base";
-      if (!matches(/^[a-zA-Z0-9][a-zA-Z0-9._/:@-]*$/, this.image))
-        this.fail("invalid_input", "PI_DOCKER_IMAGE must be an image reference without whitespace or options");
       return root;
     }
     if (!matches(NAME, this.args.target) && !matches(PANE, this.args.target))
@@ -211,7 +208,6 @@ class Workflow {
     const r = this.receipt;
     r.requested_name = this.args.name;
     r.host_workspace = root;
-    r.image = this.image;
     r.stage = "check_alias";
     const agents = (await this.call(["agent", "list"])).agents;
     if (!Array.isArray(agents) || !agents.every(object)) this.fail("malformed_response", "missing agent list");
@@ -237,7 +233,7 @@ class Workflow {
     r.stage = "start";
     const budget = Math.min(this.args.timeout_ms, Math.max(1, Math.floor((this.remaining() - .1) * 1000)));
     const started = await this.call(["agent", "start", this.args.name, "--kind", "pi", "--pane", pane,
-      "--timeout", String(budget), "--", root, "--name", this.args.name, "--image", this.image, "--herdr"],
+      "--timeout", String(budget), "--", root, "--name", this.args.name, "--herdr"],
     { effect: "startup", limit: Math.min(this.args.timeout_ms / 1000 + 1, this.remaining()) });
     r.startup = "acknowledged";
     this.remember(this.agent(started));

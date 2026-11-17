@@ -1,18 +1,51 @@
 # Reviewed Phase 1 mount contract
 
-**Phase 1 is complete.** This contract is finalized for Phase 2 adoption, **not
-production implementation or certification**. Reviewed evidence:
+**Phase 1 and Phase 2 mount validation are complete.** The Phase 1 contract was
+adopted in production and separately host-tested; neither suite certifies live Pi
+startup, Herdr socket behavior, persistence/restore or rewind. Reviewed evidence:
 
 - `report.txt`: historical 22-check Docker pass on the earlier custom image.
 - `mount-report-pi-1.5.2.txt`: refreshed **23-check Docker pass**, with runtime
   Pi 1.5.2, Node 24.22.3 and Git 2.39.5. It includes the expanded runtime-alias
   and pointer-symlink regressions plus direct `.git` symlink runtime coverage.
 - `herdr-report.txt`: disposable Herdr 0.9.5 pass, **26 assertions**.
+- `production-mount-report-pi-1.5.2.txt`: actual deployment Compose plus isolated
+  Node/fixture overrides, **23 checks pass**, run `SMNf86J3`. Same custom image
+  and Pi/Node/container-Git baseline as above; host Docker is now 29.10.0,
+  Compose 5.7.1, Git 2.53.0 and Bash 5.3.9. Report SHA256:
+  `e6184dc52946056844f14dbd7b9aa78df2d63bf07c6297dda6b10b3a80f326a3`.
 
 The copied current logs and effective standalone Compose were also reviewed;
-only the two intended missing-source probes failed. Production Compose merging
-remains a Phase 2 host integration gate. A separate base-image run, Pi startup,
-conversation restore and rewind remain later integration coverage.
+only the two intended missing-source probes failed. The new production run's
+23 check logs also agree with its report; all 13 per-container Compose artifacts
+and receipts were independently reviewed, including concurrent barriers,
+fixture-only private binds, disabled source creation and exact cwd. The top-level
+`effective-linked-compose.json` is only a prelaunch diagnostic snapshot (its
+artifact bind can still name the previous probe); the authoritative artifacts
+are `logs/<container-name>.compose.json`, each bound to its own container.
+A separate base-image run, Pi startup, conversations, restore and rewind remain
+later integration coverage.
+
+Phase 2 now implements this contract in `lib/workspace-mounts.sh` and the
+configurable production `compose.yaml` / `compose.metadata.yaml`. The launcher
+clears inherited Git discovery overrides while honoring normal host Git config;
+no trust is granted. Canonical paths are captured without silently stripping
+trailing control characters into a different directory, deployment or socket.
+Literal pointer traversal may use only represented bind trees and their parent
+hierarchy: an unrelated directory visited before `..` is not available merely
+because the normalized endpoint is valid. Administrative `commondir` and reverse
+`gitdir` files themselves must not be symlink aliases. Complete pointer-file reads
+reject NULs, control bytes and extra lines, rather than checking a misleading
+first-line prefix; one conventional final LF is optional. These extra safety
+cases have local launcher regression coverage, not new host runtime evidence.
+The prototype remains as historical test code; its 48 discovery assertions are
+also run against production through `production-mount-contract.sh`.
+
+`verify-worktree-mounts.sh --production-run` passed the mount runtime gate using
+actual production Compose/Git-config/metadata files plus isolated fixture data
+and a Node test overlay. Phase 1 reports alone did not certify this integration;
+the new production report closes that gap, not Pi startup or a live Herdr socket.
+See `tests/host/README.md` for repeat-run and exact-run cleanup instructions.
 
 ## Discovery and mounts
 
@@ -26,7 +59,7 @@ conversation restore and rewind remain later integration coverage.
 - Linked/external-metadata checkouts bind the whole physical checkout at its
   canonical absolute host path and start in the exact canonical selection.
   Bind the Git common directory separately at its physical host path only when
-  it is not already contained in the checkout bind. The prototype supports these
+  it is not already contained in the checkout bind. The prototype and production helper support these
   two required binds, not an arbitrary number of additional metadata mounts.
 - Resolve checkout root, per-worktree Git directory, and common directory through
   Git. Validate the literal `.git`, `commondir`, and reverse `gitdir` pointers.

@@ -26,9 +26,51 @@ if (e.PROBE_KIND === "external" && e.PROBE_METADATA === "0" && e.PROBE_COMMON !=
 if (e.PROBE_KIND === "external" && e.PROBE_TARGET !== "/workspace") {
   assert(!mounts.some(m => m.target === "/workspace"), "no residual /workspace project bind");
 }
-for (const target of ["/pi/agent", "/pi/sessions", "/run/gh-config", "/run/herdr/herdr.sock"]) {
-  assert(!mounts.some(m => m.target === target), `no private mount at ${target}`);
+if (e.PROBE_PRODUCTION === "1") {
+  // Compose's rendered JSON doubles literal dollars for re-interpolation. Undo
+  // that serialization escape, not shell expansion, for exact path comparison.
+  const config = JSON.parse(fs.readFileSync("/probe-effective.json", "utf8"),
+    (_, value) => typeof value === "string" ? value.replace(/\$\$/g, "$") : value).services.pi;
+  assert.equal(config.image, e.PROBE_IMAGE_ID);
+  assert.equal(config.working_dir, e.PROBE_WORKDIR);
+  const expected = new Map([
+    ["/pi/agent", [path.join(e.PROBE_FIXTURES, "config"), false]],
+    ["/pi/sessions", [path.join(e.PROBE_FIXTURES, "sessions"), false]],
+    ["/run/gh-config", [path.join(e.PROBE_FIXTURES, "gh-config"), true]],
+    ["/home/node/.gitconfig", [path.join(e.PROBE_FIXTURES, "gitconfig"), true]],
+    [e.PROBE_TARGET, [e.PROBE_CHECKOUT, false]],
+    ["/probe", [path.join(e.PROBE_DEPLOYMENT, "tests/host"), true]],
+  ]);
+  for (const resource of ["bin", "lib", "docs", "extensions", "skills", "images", "README.md",
+    "compose.yaml", "compose.git.yaml", "compose.herdr.yaml", "compose.metadata.yaml"]) {
+    expected.set(`/opt/pi-docker/${resource}`, [path.join(e.PROBE_DEPLOYMENT, resource), true]);
+  }
+  if (e.PROBE_METADATA === "1") expected.set(e.PROBE_COMMON, [e.PROBE_COMMON, false]);
+  // The exact per-container config artifact is outside fixtures; assert its
+  // location and access explicitly without trusting an arbitrary source mount.
+  const artifact = config.volumes.find(v => v.target === "/probe-effective.json");
+  assert(artifact && artifact.source.startsWith(path.join(path.dirname(e.PROBE_FIXTURES), "logs") + "/"));
+  expected.set("/probe-effective.json", [artifact.source, true]);
+  assert.equal(config.volumes.length, expected.size, "no extra or duplicate Compose mounts");
+  for (const volume of config.volumes) {
+    const wanted = expected.get(volume.target);
+    assert(wanted, `known mount target ${volume.target}`);
+    assert.equal(volume.type, "bind");
+    assert.equal(volume.source, wanted[0]);
+    assert.equal(Boolean(volume.read_only), wanted[1]);
+    assert.equal(volume.bind.create_host_path, false);
+    assert(mount(volume.target).options.includes(wanted[1] ? "ro" : "rw"), "effective access mode");
+  }
+  for (const target of ["/pi/agent", "/pi/sessions", "/run/gh-config"])
+    assert.equal(fs.readFileSync(`${target}/fixture-marker`, "utf8"), "mount fixture\n");
+  assert.equal(fs.readFileSync("/home/node/.gitconfig", "utf8"), "# mount fixture\n");
+  console.log("PASS exact production Compose bind sources/targets/access/cwd; all private data is fixture-only");
+} else {
+  for (const target of ["/pi/agent", "/pi/sessions", "/run/gh-config", "/run/herdr/herdr.sock"]) {
+    assert(!mounts.some(m => m.target === target), `no private mount at ${target}`);
+  }
 }
+assert(!mounts.some(m => m.target === "/run/herdr/herdr.sock"), "no live Herdr socket exposed");
 assert(!e.HERDR_SOCKET_PATH && !e.HERDR_PANE_ID, "no inherited Herdr control context");
 if (e.PROBE_MAIN_SENTINEL) assert(!fs.existsSync(e.PROBE_MAIN_SENTINEL), "original checkout source not exposed");
 if (e.PROBE_KIND === "ordinary") {

@@ -13,8 +13,12 @@ For launcher options, see [usage](USAGE.md).
   for integration. Standalone Docker Desktop use requires host networking and
   compatible GNU utilities; it is not the integration target.
 
-Host Pi, Git, Node.js, and Python are not needed for launching. For offline tests,
-see the [repository README](../README.md#repository-and-tests).
+Host Pi, Node.js, and Python are not needed for launching. Git 2.31+ is required
+for any selection with an enclosing `.git` marker. Without Git, only successfully
+inspected marker-free ordinary directories can launch. Help/local diagnostics
+need no Git. Compose must support long-form binds with `create_host_path: false`
+and `run --pull never`. For offline tests, see the
+[repository README](../README.md#repository-and-tests).
 
 ## 1. Build Pi
 
@@ -41,7 +45,7 @@ Ensure `~/.local/bin` is on PATH. `pi --help` shows launcher help;
 
 ```bash
 pi /absolute/path/to/project --no-herdr
-# Or add: --image pi-docker:custom
+# Local custom is selected automatically when available; otherwise base.
 ```
 
 Choose an existing project. Inside Pi, run `/login` then `/model`, or configure
@@ -55,7 +59,9 @@ New pane shells must resolve `pi` to this launcher. See [Herdr setup](HERDR_INTE
 
 | Host | Container | Access/purpose |
 |---|---|---|
-| Selected project | `/workspace` | Writable project |
+| Selected ordinary directory/self-contained checkout | `/workspace` | Writable selected directory |
+| Linked/external-metadata checkout | Canonical absolute host checkout path | Whole checkout writable; cwd is exact selected subdirectory |
+| Required external Git common directory | Canonical absolute host metadata path | Writable Git metadata; omitted if already contained in checkout |
 | Allowlisted `bin/`, `lib/`, `docs/`, `images/`, `extensions/`, `skills/`, README and Compose files | `/opt/pi-docker/<path>` | Read-only deployment paths; no repository-root mount |
 | `data/config/` | `/pi/agent` | Shared writable settings, models, credentials, resources |
 | `data/gh-config/` | `/run/gh-config` | Read-only GitHub credentials; may be empty |
@@ -68,26 +74,48 @@ file. Mounted source may be newer than the image. Builds use only `images/`,
 with a narrow allowlist in `images/.dockerignore`; custom copies its own resources.
 Never bind the repository root at `/opt/pi-docker`: it contains private state.
 
+## Worktree mount policy
+
+Select an existing checkout, e.g. `pi /host/path/to/worktree --name reviewer`.
+Git discovers checkout root, per-worktree directory and common directory; Docker
+preserves required absolute paths instead of rewriting Git pointers. The main
+checkout's source files are not mounted just to expose its `.git`. Metadata
+already inside a required checkout bind is deduplicated. Unsupported extra
+pointer paths, broad/unsafe metadata overlaps, or missing metadata fail closed.
+Direct `.git` symlinks to represented physical metadata work; literal metadata
+pointers through further symlink aliases are conservatively rejected, including
+aliases hidden by `..`. Unrelated unmounted directories visited before `..` are
+also rejected, even when the final endpoint is represented. Administrative
+`commondir` and reverse `gitdir` files must not be symlink aliases. Pointer files
+must contain one line, optionally ending in LF; NULs, embedded controls and extra
+lines are unsupported. Symlinked directory selections are canonicalized normally.
+
+Path-preserving checkout/common-metadata destinations may not equal, contain,
+or sit below `/pi`, `/run`, `/var/run`, `/var/lock`, `/opt/pi-docker`, `/home/node`,
+`/usr`, `/bin`, `/sbin`, `/lib`, `/lib64`, `/etc`, `/dev`, `/proc`, `/sys`, `/boot`,
+or `/root`. `/tmp` itself is also reserved, but projects below it are allowed.
+Checks use path-component boundaries, not a project-prefix allowlist. Every
+bind disables source creation; disappearing sources fail instead of creating
+host directories. `/workspace` is not globally reserved: the default project
+bind is replaced, not retained beneath a path-preserving layout.
+
+Selected-directory/name conversation storage does not widen to the checkout
+root. No checkout creation, Git repair, registry, or automatic cleanup is added.
+
 ## Migrating the old layout
 
 Replace the old `setup/bin/pi` launcher symlink with `bin/pi` using step 2 above.
 Rebuild base, then custom, and restart containers to refresh the deployment mounts.
 Build tags are now `pi-docker:base` and `pi-docker:custom`. Use `./bin/build custom`
-in place of the old personal variant, and update any exported `PI_DOCKER_IMAGE`
-or `PI_DOCKER_BASE_IMAGE` to the new tags. Private `data/` stays in place; do not
-move or regenerate it.
+in place of the old personal variant. `PI_DOCKER_BASE_IMAGE` is a build input;
+`PI_DOCKER_IMAGE` is no longer a launch preference. Private `data/` stays in place;
+do not move or regenerate it.
 
-Restore records retain old image references. Keep the old images or deliberately
-alias the rebuilt ones on the host if you want old records to use the new builds:
-
-```bash
-docker tag pi-docker:base pi-agent:latest
-docker tag pi-docker:custom pi-agent:custom
-docker tag pi-docker:custom pi-agent:personal
-```
-
-New image tags have new restore keys, but workspace/name conversation storage is
-unchanged. Do not rewrite existing records or their keys.
+Current native-restore records use image-independent v3 keys and contain only
+version, selected directory and storage name. Old v1/v2 records/references are
+unsupported and fail clearly; there is no migration, alias loader or deletion of
+old files. Physical workspace/name conversation storage is unchanged. Do not
+rewrite old records or assume that retaining/tagging legacy images enables them.
 
 ## Security and concurrency
 
@@ -103,6 +131,9 @@ unchanged. Do not rewrite existing records or their keys.
 - Keep secrets only in private `data/`, not deployment paths. Mounting this repository root as the project also
   exposes private `data/` through writable `/workspace`; choose a narrower project
   when possible. Back up credentials, sessions, and restore records privately.
+- Be aware: All agents working on the same repository share read/write access
+  to its Git metadata, including objects, refs, and configuration, even when
+  working in different worktrees.
 - Containers/images do not isolate shared configuration or concurrent checkout
   writes. Use separate worktrees for writing agents and avoid concurrent credential
   refresh/configuration changes. See [credential handling](AUTHENTICATION.md).
@@ -115,8 +146,8 @@ unchanged. Do not rewrite existing records or their keys.
 | Symptom | Check |
 |---|---|
 | Wrong `pi` executable | `command -v pi`; inspect the launcher symlink |
-| Missing image | Docker access, `--image`/`PI_DOCKER_IMAGE`, then build the selected image |
-| Missing Python/uv/nano/extensions | Select custom; these are absent from base |
+| Missing image | Check Docker access, then build base and optionally custom; selection is automatic |
+| Missing Python/uv/nano/extensions | Build custom; these are absent from base |
 | Herdr unavailable | `pi <project> --herdr-status`; see [diagnostics](HERDR_INTEGRATION.md#maintenance-and-diagnostics) |
 | Changed resource not active | [Reload/rebuild rules](CUSTOMIZATION.md#applying-changes) |
 | Model API unreachable | Check configured URL from host and container; host-local APIs can use `127.0.0.1` |
@@ -126,6 +157,7 @@ For Compose diagnostics, supply launcher variables explicitly; output may expose
 ```bash
 PI_CONFIG="$PWD/data/config" GH_CONFIG="$PWD/data/gh-config" \
 PI_SESSIONS="$PWD/data/sessions/check" PI_WORKSPACE="$PWD/docs" \
+PI_CHECKOUT_SOURCE="$PWD/docs" PI_CHECKOUT_TARGET=/workspace PI_WORKDIR=/workspace \
 PI_UID="$(id -u)" PI_GID="$(id -g)" \
   docker compose -f compose.yaml config
 ```

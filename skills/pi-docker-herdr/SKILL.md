@@ -1,6 +1,6 @@
 ---
 name: pi-docker-herdr
-description: Start Pi Docker helpers or ask a ready peer in an integrated Herdr session. Adds host-path/image handling and bounded receipts to the official Herdr skill.
+description: Start Pi Docker helpers or ask a ready peer in an integrated Herdr session. Adds host-path handling and bounded receipts to the official Herdr skill.
 ---
 
 # Pi Docker helper adapter
@@ -31,8 +31,9 @@ per peer.
   `HERDR_SOCKET_PATH`; never fabricate context or select another server.
 - Startup uses absolute `PI_DOCKER_HOST_WORKSPACE`, not `$PWD` or `/workspace`.
   Missing metadata requires a fresh integrated launch, not a guessed host path.
-- Helpers preserve `PI_DOCKER_IMAGE`; absent metadata defaults to
-  `pi-docker:base`. Invalid image references fail before splitting.
+- Helpers neither forward nor record an image choice. The host launcher freshly
+  selects local custom if available, otherwise base. Ignore inherited
+  `PI_DOCKER_IMAGE`; never pass obsolete `--image` arguments.
 - Host `pi` must resolve to this deployment's launcher. Do not reconstruct launch
   commands, probe sibling shells, or replay caller flags/sessions.
 - Separate conversation storage is not file isolation. The adapter uses Node

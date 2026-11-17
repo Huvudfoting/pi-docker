@@ -43,9 +43,10 @@ skill, loading instructions on demand. The Node.js adapter needs no Python or
 extra npm dependencies. It starts a focus-preserving sibling or submits once to
 an explicit ready peer. General inspection/terminal control stays with upstream.
 
-Helpers preserve `PI_DOCKER_IMAGE` and use `PI_DOCKER_HOST_WORKSPACE`, the selected
-host project root—even from a container subdirectory. Never substitute
-`/workspace` for the host path. Fresh names select separate conversation storage,
+Helpers use `PI_DOCKER_HOST_WORKSPACE`, the exact selected canonical host
+directory—even from a container subdirectory. They do not inherit or forward an
+image choice; the host launcher selects custom/base afresh. Never substitute
+`/workspace` or the container's current path for that host metadata. Fresh names select separate conversation storage,
 **not file isolation**. Keep one outstanding request per ready peer.
 
 A successful wait is not proof of task completion: inspect the response.
@@ -60,17 +61,23 @@ pi /absolute/path/to/project --name backend --herdr -- --continue
 # Or use --resume instead of --continue.
 ```
 
-Native restore recovers workspace, storage, image, and conversation—not all
-original flags—and requires integration. Back up `data/herdr-launches/` together
+Native restore recovers selected directory, storage and conversation—not the
+image or all original flags—and requires integration. Mounts are rediscovered
+from the current checkout on every restore. Back up `data/herdr-launches/` together
 with `data/sessions/`. Missing records/workspaces/sessions abort rather than
 create a replacement. `/pi/herdr-sessions/<key>/` paths belong to the restore
 protocol; do not construct them manually.
 
-Image tags have distinct restore keys. New launches use `pi-docker:base` or the
-selected image; v1 legacy records still select `pi-agent:latest`. Keep or alias
-old tags as described in [migration](SETUP.md#migrating-the-old-layout).
-Tags remain mutable. Conversation storage is still selected
-by workspace/name, so switching images does not isolate conversations or files.
+New v3 restore keys/records are image-independent. Each launch selects local
+custom if available, otherwise base; switching image availability keeps the same
+conversation storage and restore reference. Older v1/v2 records/references are
+unsupported, without migration or compatibility loaders. Existing files are not
+deleted; see [format transition](SETUP.md#migrating-the-old-layout).
+
+The mounting/format foundation is implemented; live persistence/native-restore
+validation remains a separate integration gate. Pi 1.5.2's interactive missing-cwd
+Continue/Fork/Cancel recovery is not a Docker-Pi restore fallback: a missing
+recorded directory fails before starting the container.
 
 ## Maintenance and diagnostics
 

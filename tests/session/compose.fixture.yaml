@@ -1,0 +1,22 @@
+# TEST ONLY, copied into the disposable deployment as compose.yaml.
+# compose.production.yaml is an unchanged copy of the production compose.yaml.
+# Inherit the real image entrypoint and launcher-selected mounts/image/cwd.
+name: "${PHASE3_PROJECT:?}"
+services:
+  pi:
+    extends:
+      file: ./compose.production.yaml
+      service: pi
+    stdin_open: false
+    tty: false
+    environment:
+      HOME: /tmp
+    network_mode: none
+    read_only: true
+    mem_limit: 1g
+    cpus: 2
+    pids_limit: 256
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=128m,mode=1777
+    labels:
+      pi-docker.phase3-run: "${PHASE3_PROJECT:?}"

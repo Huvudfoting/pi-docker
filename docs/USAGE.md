@@ -7,19 +7,21 @@ repository's launcher, not a host-native Pi installation.
 
 ```bash
 pi ~/repos/project
-pi ~/repos/project --image pi-docker:custom --name reviewer --herdr
+pi ~/repos/project --name reviewer --herdr
 pi ~/repos/project --no-herdr -- --continue
 pi ~/repos/project -- --resume
 pi ~/repos/project --no-herdr -- --version
 ```
 
 An explicit existing workspace comes first; otherwise the current directory is
-mounted at `/workspace`. Put launcher options before Pi arguments:
+selected. Ordinary directories and conventional self-contained checkouts use
+`/workspace`. Linked/external-metadata checkouts preserve absolute host paths,
+mount the whole checkout plus required Git metadata, and start in the exact
+selected subdirectory. Put launcher options before Pi arguments:
 
 | Option | Effect |
 |---|---|
 | `--name NAME` | Select conversation storage, not the conversation title or Herdr agent name |
-| `--image IMAGE` | Override `PI_DOCKER_IMAGE` and automatic selection; use `--image pi-docker:base` to force base |
 | `--no-host-gitconfig` | Omit the host's readable `~/.gitconfig` |
 | `--herdr` | Require integration; abort if unavailable |
 | `--no-herdr` | Skip integration preparation and socket exposure |
@@ -29,15 +31,17 @@ mounted at `/workspace`. Put launcher options before Pi arguments:
 
 `--name` accepts letters, digits, dots, underscores, and hyphens. It defaults to
 the workspace basename; supply a name if that basename contains other characters.
-Without an override, the launcher uses local `pi-docker:custom` if available,
-otherwise `pi-docker:base`. Select only built images; the launcher does not build
-or pull them. To pin the default:
+Every launch, helper start, and restore selects local `pi-docker:custom` if
+available, otherwise `pi-docker:base`. `--image` is rejected; inherited
+`PI_DOCKER_IMAGE` is ignored. Image lookup/daemon errors abort, not silently fall
+back. The launcher does not build or pull images. See
+[image builds and customization](CUSTOMIZATION.md#two-images).
 
-```bash
-export PI_DOCKER_IMAGE=pi-docker:custom
-```
-
-See [image builds and customization](CUSTOMIZATION.md#two-images).
+Host Git 2.31+ is required when a `.git` marker exists in any ancestor, including
+a dangling symlink. Without Git, ordinary directories launch only after a
+successful marker-free ancestor scan; help and local diagnostics need no Git.
+Invalid metadata, unsafe mount destinations, and unavailable pointer paths fail
+clearly without creating or repairing a checkout. See [mount policy](SETUP.md#worktree-mount-policy).
 
 ## Inside Pi
 
@@ -53,7 +57,10 @@ See [change handling](CUSTOMIZATION.md#applying-changes).
 Storage is `data/sessions/<name>-<workspace-path-hash>/`. Launching again selects
 that storage; `--continue` or `--resume` reopens a conversation. Different names
 separate storage, **not files**. Changing images also does not isolate storage.
-Use separate Git worktrees for concurrent writing agents.
+Use separate Git worktrees for concurrent writing agents. `--name` does not
+create or select a worktree; select its directory explicitly. Container exit
+never removes it. Unqualified cross-name conversation discovery/isolated-helper
+creation is not implemented yet; the existing named storage remains in effect.
 
 All images share configuration, credentials, extensions, and skills in
 `data/config/`. Avoid concurrent configuration writes; see [mounts and security](SETUP.md).

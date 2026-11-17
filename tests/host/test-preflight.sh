@@ -57,6 +57,12 @@ for mode in daemon-failure lookup-failure inspect-failure; do
   ! grep -q 'image inspect pi-docker:base' "$FAKE_LOG"
   printf 'PASS %s is not custom absence or permission to fall back\n' "$mode"
 done
+export FAKE_MODE=custom
+: > "$FAKE_LOG"
+run --production-preflight > "$root/result"
+grep -q 'Image: pi-docker:custom' "$root/result"
+! grep -Eq 'run |create |pull |build |remove |rm ' "$FAKE_LOG"
+printf 'PASS production preflight is also read-only\n'
 : > "$FAKE_LOG"
 if env -u DOCKER_CONTEXT DOCKER_HOST=tcp://fixture.invalid:2375 bash "$here/verify-worktree-mounts.sh" --preflight > "$root/result" 2>&1; then exit 1; fi
 grep -q 'local Unix-socket' "$root/result"
@@ -69,4 +75,15 @@ compose_files=(-f "$here/compose.probe.yaml")
 run_container stdin-regression > "$root/batch-result"
 grep -q 'fake batch probe completed with closed stdin' "$root/batch-result"
 printf 'PASS batch probe disables TTY/interactivity and binds stdin to /dev/null\n'
+# Test the production wrapper without calling Compose/config or a real daemon.
+# A unique effective-config artifact is created before each fake run.
+production=1; compose_directory="$root"; probe_service=pi
+mkdir "$root/logs"
+export PROBE_CHECKOUT="$root/missing-checkout" PROBE_COMMON="$root/missing-common"
+compose() { printf '{"services":{}}\n'; }
+run_container production-batch > "$root/production-batch-result"
+[[ "$PI_CHECKOUT_SOURCE" == "$PROBE_CHECKOUT" && "$PI_GIT_COMMON" == "$PROBE_COMMON" ]]
+[[ -f "$PROBE_EFFECTIVE" && "$PROBE_EFFECTIVE" == "$root/logs/"* ]]
+grep -q -- '--name fixture-1-production-batch pi' "$FAKE_LOG"
+printf 'PASS production batch uses service pi, discovery sources, and a per-container config artifact\n'
 printf 'All preflight/batch-command checks passed (fake Docker only).\n'

@@ -1,0 +1,11 @@
+# Included only when discovery requires a separate common-Git-directory bind.
+# Checkout source/target and cwd are configured in compose.yaml; no residual
+# /workspace project mount is merged into a path-preserving launch.
+services:
+  pi:
+    volumes:
+      - type: bind
+        source: "${PI_GIT_COMMON:?}"
+        target: "${PI_GIT_COMMON:?}"
+        bind:
+          create_host_path: false

@@ -2,7 +2,7 @@
 # Offline tests for the experimental Bash/Git contract. No Docker/Node/Python.
 set -euo pipefail
 here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-source "$here/mount-contract.sh"
+source "${MOUNT_CONTRACT_IMPL:-$here/mount-contract.sh}"
 root="$(mktemp -d /tmp/pi-mount-unit.XXXXXXXX)"
 trap 'rm -rf -- "$root"' EXIT
 export GIT_AUTHOR_NAME=Fixture GIT_AUTHOR_EMAIL=fixture@example.invalid
