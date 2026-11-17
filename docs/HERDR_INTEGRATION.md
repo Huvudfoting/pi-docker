@@ -65,8 +65,10 @@ Native restore recovers selected directory, storage and conversation—not the
 image or all original flags—and requires integration. Mounts are rediscovered
 from the current checkout on every restore. Back up `data/herdr-launches/` together
 with `data/sessions/`. Missing records/workspaces/sessions abort rather than
-create a replacement. `/pi/herdr-sessions/<key>/` paths belong to the restore
-protocol; do not construct them manually.
+create a replacement. Empty or host-unreadable requested session files also
+abort before container launch; Pi handles parsing of nonempty files.
+`/pi/herdr-sessions/<key>/` paths belong to the restore protocol; do not construct
+them manually.
 
 New v3 restore keys/records are image-independent. Each launch selects local
 custom if available, otherwise base; switching image availability keeps the same
@@ -77,7 +79,14 @@ deleted; see [format transition](SETUP.md#migrating-the-old-layout).
 The mounting/format foundation is implemented; live persistence/native-restore
 validation remains a separate integration gate. Pi 1.5.2's interactive missing-cwd
 Continue/Fork/Cancel recovery is not a Docker-Pi restore fallback: a missing
-recorded directory fails before starting the container.
+recorded host directory fails before starting the container. A surviving host
+selection can nevertheless rediscover a different container cwd (for example,
+a linked checkout becoming an ordinary directory at `/workspace`). Pi's immutable
+session-header cwd does not follow that change: explicit reopen may fail or show
+Pi's missing-cwd UI, while `--continue` may start separate history. Continuity
+across such layout changes is unsupported under the current policy; no header
+rewriting, historical layout state or migration is performed. See the
+[offline probe results](../tests/session/README.md#follow-up-offline-probes-cwd-transitions-and-unusable-explicit-sessions).
 
 ## Maintenance and diagnostics
 

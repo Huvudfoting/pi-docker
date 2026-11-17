@@ -97,6 +97,75 @@ class SessionFixtureTest(unittest.TestCase):
         self.assertEqual(Path(first['sessionFile']).read_bytes(), before)
         self.assertEqual(len(list(self.store.glob('*.jsonl'))), 1)
 
+    def test_replacement_directory_at_same_cwd_reopens_existing_history(self):
+        first = self.run_pi('phase3-first')
+        self.cwd.rmdir()
+        self.cwd.mkdir()
+        second = self.run_pi('phase3-second', '--session', first['sessionFile'])
+        self.assertEqual(second['sessionId'], first['sessionId'])
+        self.assertEqual(second['sessionFile'], first['sessionFile'])
+        self.assertEqual(second['headerCwd'], str(self.cwd))
+        self.assertEqual(second['users'], ['phase3-first', 'phase3-second'])
+
+    def test_changed_layout_continue_starts_new_history_for_current_cwd(self):
+        # Model two mount layouts with distinct absolute paths, not actual mounts.
+        first = self.run_pi('phase3-first')
+        original = Path(first['sessionFile']).read_bytes()
+        ordinary = self.root / 'ordinary-layout'
+        ordinary.mkdir()
+        second = self.run_pi('phase3-second', '--continue', cwd=ordinary)
+        self.assertNotEqual(second['sessionId'], first['sessionId'])
+        self.assertEqual(second['headerCwd'], str(ordinary))
+        self.assertEqual(second['users'], ['phase3-second'])
+        self.assertEqual(Path(first['sessionFile']).read_bytes(), original)
+        self.assertEqual(len(list(self.store.glob('*.jsonl'))), 2)
+
+    def test_changed_layout_reopen_fails_if_old_header_cwd_is_absent(self):
+        first = self.run_pi('phase3-first')
+        original = Path(first['sessionFile']).read_bytes()
+        ordinary = self.root / 'ordinary-layout'
+        self.cwd.rename(ordinary)
+        result = self.run_pi('phase3-second', '--session', first['sessionFile'],
+                             cwd=ordinary, success=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(str(self.cwd), result.stderr)
+        self.assertEqual(Path(first['sessionFile']).read_bytes(), original)
+        self.assertEqual(len(list(self.store.glob('*.jsonl'))), 1)
+
+    def test_nonempty_invalid_requested_sessions_fail_without_mutation(self):
+        self.store.mkdir()
+        for name, content in [('malformed', '{not-json}\n'),
+                              ('wrong-type', '{"type":"message"}\n')]:
+            with self.subTest(name=name):
+                requested = self.store / (name + '.jsonl')
+                requested.write_text(content)
+                before = {p.name: p.read_bytes() for p in self.store.iterdir()}
+                result = self.run_pi('phase3-invalid', '--session', str(requested), success=False)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn('not a valid', result.stderr)
+                self.assertEqual({p.name: p.read_bytes() for p in self.store.iterdir()}, before)
+                self.assertFalse((self.agent / 'phase3-result.json').exists())
+
+    def test_empty_requested_session_is_initialized_by_upstream(self):
+        # Characterization, NOT the deployment's required fail-closed behavior.
+        self.store.mkdir()
+        requested = self.store / 'empty.jsonl'
+        requested.touch()
+        state = self.run_pi('phase3-empty', '--session', str(requested))
+        self.assertEqual(state['sessionFile'], str(requested))
+        self.assertEqual(state['users'], ['phase3-empty'])
+        self.assertGreater(requested.stat().st_size, 0)
+        self.assertEqual(list(self.store.glob('*.jsonl')), [requested])
+
+    def test_missing_requested_path_is_created_by_upstream(self):
+        # Characterization, NOT permission to create native-restore replacements.
+        requested = self.store / 'missing.jsonl'
+        state = self.run_pi('phase3-missing', '--session', str(requested))
+        self.assertEqual(state['sessionFile'], str(requested))
+        self.assertEqual(state['users'], ['phase3-missing'])
+        self.assertTrue(requested.is_file())
+        self.assertEqual(list(self.store.glob('*.jsonl')), [requested])
+
     def test_fixture_cannot_activate_without_sentinel(self):
         (self.agent / 'phase3-fixture').unlink()
         result = self.run_pi('phase3-first', success=False)

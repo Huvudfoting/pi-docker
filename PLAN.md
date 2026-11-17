@@ -224,10 +224,11 @@ For the next session:
 1. Inspect current Git status and preserve the user's staged/unstaged changes.
    Read this handoff and `tests/session/README.md`; do not repeat completed host
    gates merely to reconstruct disposable artifacts.
-2. Continue Phase 3, not Phase 4: investigate real session-header cwd transitions
-   and malformed/unusable requested-session behavior in isolated offline tests;
-   review any discovered policy issue before changing settled mount/history
-   semantics or adding migration/historical state.
+2. Continue Phase 3, not Phase 4: the offline cwd-transition and explicit-session
+   probes below are implemented. Preserve the user's decision to document
+   layout-changing continuity as unsupported, without changing settled
+   mount/history semantics or adding migration/historical state. Actual Docker
+   transition behavior and interactive malformed-session handling remain gates.
 3. Plan interactive resume and official native Herdr restore validation. Obtain
    explicit consent for a genuinely disposable Herdr session/live socket before
    using it; the approved offline provider is not consent for live APIs or real
@@ -235,6 +236,51 @@ For the next session:
    inherited context, never fabricated pane/session IDs.
 4. Keep base-image runtime and cross-image continuity explicit remaining gates.
    Do not mark Phase 3 complete or begin helper lifecycle orchestration yet.
+### Follow-up: offline transitions and unusable requested sessions
+
+The local real installed Pi 1.5.2 suite now has **12 passing tests** (six added):
+
+- Replacement directory at the identical header cwd reopens the same ID/file and
+  history; no checkout-identity check is performed by Pi.
+- Different startup cwd with the same storage and `--continue` creates separate
+  history, leaving the original untouched. Storage identity alone does not ensure
+  layout-changing continuity.
+- Explicit reopen after the old cwd disappears fails in print mode without
+  replacement or file mutation. Existing-cwd reopen still uses the original cwd.
+- Nonempty malformed JSON and non-session entries fail without mutation or
+  provider activation. This is not strict validation of all damaged history.
+- Empty explicit files are initialized and missing explicit paths are created by
+  upstream Pi. These are characterization tests, not accepted native-restore
+  behavior.
+
+**Explicit user decision:** preserve current policy and document layout-changing
+continuity as a limitation. No mount changes, historical state, migration, header
+rewriting or pointer repair. Linked-to-ordinary rediscovery can pass host checks
+but still fail old-history reopening; an interactive missing-header-cwd UI may
+appear even when the selected host directory exists. These private absolute-path
+probes are **not actual Docker layout transitions or native Herdr evidence**.
+
+`herdr_validate_session_file` now additionally rejects empty or host-unreadable
+native-restore files, satisfying the existing no-replacement requirement without
+adding a session parser. Missing/out-of-storage file checks remain. The new
+fake-Docker regression verifies the empty file is rejected before Compose launch
+or reporter preparation, without session/record mutation (read-only image probes
+may run first). Positive fake-Docker fixtures now contain nonempty sentinels;
+they still do not certify Pi parsing/readiness. Nonempty parsing remains Pi's
+responsibility; container-user readability and interactive failure modes still
+need integration evidence.
+
+Current local validation: **136 tests discovered: 117 passed, 19 skipped** because
+test-only jq is absent (13 contract-driver and 6 session-host-driver checks).
+All 12 real-Pi CLI tests and 60 launcher tests pass. Bash syntax and current
+`git diff --check` pass. No dependency was installed, live Herdr socket contacted,
+Docker run attempted, host cleanup executed or Git commit/staging performed.
+See `tests/session/README.md` and `docs/HERDR_INTEGRATION.md` for the limitation.
+Next gates remain interactive resume, consented disposable native Herdr restore,
+base/cross-image continuity and real host transition/failure evidence.
+
+### Earlier production mount and persistence evidence
+
 The production launcher now adopts the tested mount contract, selects images
 freshly, ignores inherited image preferences, rejects obsolete `--image`, and
 validates Compose configuration before launch. Source creation is disabled for
@@ -557,8 +603,11 @@ inside the container.
 **In progress.** The image-independent v3 prerequisite landed in Phase 2. Local
 real-Pi fixture tests and the first offline real-entrypoint host driver are now
 implemented; its real custom-image host report passed all 14 checks. Interactive
-picker, native Herdr, base-image continuity and session-header layout-transition
-evidence is still pending. See the handoff and
+picker, native Herdr, base-image continuity and actual Docker layout-transition
+evidence is still pending. Offline cwd-transition probes now establish an
+upstream continuity limitation, which the user chose to document without policy
+changes. Empty native-restore files are now rejected before container launch.
+See the handoff and
 `tests/session/README.md`; no Phase 3 completion claim is made.
 
 1. Retain the exact canonical selected directory (including any selected

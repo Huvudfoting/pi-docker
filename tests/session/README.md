@@ -27,7 +27,8 @@ private HOME/config/auth/session storage, `--offline`, no MCP or tools, and no
 inherited credentials or Herdr context. They cover persisted turns, stable
 continue IDs/files/history, explicit session reopen restoring its recorded cwd,
 separate storage isolation, missing recorded cwd without a replacement, and
-sentinel enforcement. They skip when Node/Pi is absent; `PI_PHASE3_CLI` can select
+sentinel enforcement. The suite now has **12 tests**, including the cwd-transition
+and explicitly requested file characterizations below. They skip when Node/Pi is absent; `PI_PHASE3_CLI` can select
 a reviewed installation outside the image's normal package path. No Python
 packages or global installs are required. This is **not** a Docker/entrypoint or
 native Herdr test.
@@ -145,6 +146,47 @@ The report lowercases the project suffix and redacts paths, so it does not revea
 that exact path; do not guess it or use a wildcard deletion. Check for nested
 mounts before deletion. No cleanup has been executed by the coding agent.
 
+## Follow-up offline probes: cwd transitions and unusable explicit sessions
+
+The 12 isolated installed-Pi 1.5.2 CLI tests pass. These are real Pi operations,
+but **not Docker mount-transition or native Herdr restore evidence**. Distinct
+private absolute directories model different container cwd layouts:
+
+- Replacing the selected directory at the identical absolute cwd preserves the
+  session ID/file/history on explicit reopen. Pi does not check checkout identity.
+- Reopening from another existing cwd still uses the original header cwd.
+- If the old header cwd disappears after a layout change, explicit print-mode
+  reopen fails without changing the conversation or creating a replacement.
+- With the same session storage but a different current cwd, `--continue` creates
+  separate history and leaves the previous conversation unchanged. Storage-key
+  stability alone therefore does **not** establish continuity across cwd changes.
+- Nonempty malformed JSON and a non-session entry fail explicit reopen without
+  file changes, extra sessions or provider activation. These cases do not prove
+  strict validation of every possible damaged session: Pi's loader is permissive.
+- An empty explicitly requested file is initialized by Pi; a missing explicit
+  pathname is created. These are upstream characterizations, **not** deployment
+  acceptance criteria for native restore.
+
+**User decision after reviewing the probes:** preserve current rediscovery and
+immutable history policy; document layout-changing continuity as a limitation.
+No historical layout flags, migration, header rewriting, pointer repair or mount
+changes are added. In particular, linked-to-ordinary rediscovery can be accepted
+by the host while the old conversation cannot reopen at its former cwd. An
+interactive missing-header-cwd recovery UI may still appear when the recorded
+host selection survives but its container path changes; this is not a verified
+native restore success or an automatic deployment fallback.
+
+The native-restore launcher already rejects missing files and out-of-storage
+paths. It now also rejects empty or host-unreadable requested files before
+Compose launch/reporter preparation, preventing Pi from initializing an empty
+requested conversation. One fake-Docker regression asserts no Compose launch,
+reporter calls or session/record mutation; read-only image selection may precede
+the check. Existing fake-Docker positive tests use nonempty sentinels only, not
+validity/readiness evidence. Pi remains responsible for parsing nonempty files;
+no independent session parser or broad history scanner is introduced. Actual
+container-user readability and interactive malformed-session behavior remain
+integration gates.
+
 ## Still required before Phase 3 is complete
 
 - Real interactive `--resume` picker, title/name and cwd/history selection checks.
@@ -155,11 +197,11 @@ mounts before deletion. No cleanup has been executed by the coding agent.
 - Validate freshly selected custom/base continuity without automatic tag changes;
   current image-switch coverage is fake-Docker only, with this host run using the
   image currently available. A base-only integration run remains separate.
-- Probe replacement-layout/session-header cwd transitions: host rediscovery is
-  tested, but Pi 1.5.2 stores immutable container cwd in session headers. A linked
-  absolute cwd becoming ordinary `/workspace` is **not** established by host-only
-  acceptance tests. Do not add historical flags, migration, pointer repair or
-  mount policy changes without reviewing actual behavior and the agreed contract.
+- Validate replacement-layout/session-header cwd transitions on the Docker host.
+  Offline path probes above establish the upstream limitation, not actual mounts.
+  Per the user's decision, layout-changing continuity is unsupported without a
+  separate policy review; do not add historical flags, migration, pointer repair
+  or mount changes. Same-cwd replacement continuity still needs host evidence.
 - Native missing checkout/metadata failures must occur before Pi's interactive
   Continue/Fork/Cancel fallback; closing Pi versus Herdr workspace close/removal
   retains the verified upstream semantics. Validate malformed/unusable session

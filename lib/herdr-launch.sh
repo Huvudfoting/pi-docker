@@ -120,6 +120,10 @@ herdr_validate_session_file() {
   mount_capture_path realpath -e -- "$session/$restore_filename" \
     && [[ "$mount_path_result" == "$session/$restore_filename" ]] \
     || fail "Managed session must not resolve outside its recorded storage"
+  # Pi initializes empty explicit session files with new history. Native restore
+  # must not turn an unusable requested conversation into a replacement.
+  [[ -s "$session/$restore_filename" && -r "$session/$restore_filename" ]] \
+    || fail "Cannot restore empty or unreadable session: $session/$restore_filename. Restore it from backup; no replacement will be created."
 }
 
 # A subshell keeps the restrictive umask and temporary-file trap local.

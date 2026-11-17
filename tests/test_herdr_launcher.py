@@ -206,7 +206,7 @@ class HerdrLauncherTest(unittest.TestCase):
     def test_native_restore_selects_image_afresh_with_image_independent_records(self):
         original = self.initial_launch()
         filename = 'image-test.jsonl'
-        (Path(original['env']['PI_SESSIONS']) / filename).touch()
+        (Path(original['env']['PI_SESSIONS']) / filename).write_text('fixture conversation sentinel\n')
         reference = f"{original['env']['PI_SESSION_TARGET']}/{filename}"
         for missing, expected in [('', 'pi-docker:custom'), ('pi-docker:custom', 'pi-docker:base')]:
             env = {**self.env, 'MISSING_IMAGE': missing, 'PI_DOCKER_IMAGE': 'ignored:preference'}
@@ -471,7 +471,7 @@ class HerdrLauncherTest(unittest.TestCase):
 
     def test_restore_integration_failure_never_falls_back(self):
         original = self.initial_launch()
-        (Path(original['env']['PI_SESSIONS']) / 'persisted.jsonl').touch()
+        (Path(original['env']['PI_SESSIONS']) / 'persisted.jsonl').write_text('fixture conversation sentinel\n')
         result, invocation = self.launch('--session', original['env']['PI_SESSION_TARGET'] + '/persisted.jsonl',
                                          env={**self.env, 'HERDR_EXIT': '23'})
         self.assertEqual(result.returncode, 2, result.stderr)
@@ -627,7 +627,7 @@ class HerdrLauncherTest(unittest.TestCase):
         self.assertEqual(record.stat().st_mode & 0o777, 0o600)
         self.assertNotIn(b"herdr.sock", record.read_bytes())
         filename = "2026-01-01T12-00-00-000Z_example.jsonl"
-        (Path(original["env"]["PI_SESSIONS"]) / filename).touch()
+        (Path(original["env"]["PI_SESSIONS"]) / filename).write_text('fixture conversation sentinel\n')
         reference = f"{target}/{filename}"
         fresh = {**self.env, "HERDR_PANE_ID": "w2:p3", "HERDR_SOCKET_PATH": str(self.make_socket("new.sock")),
                  "PI_WORKSPACE": str(self.other), "PI_DOCKER_HOST_WORKSPACE": "/stale/project", "DOCKER_EXIT": "17"}
@@ -668,6 +668,26 @@ class HerdrLauncherTest(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("outside", result.stderr)
         self.assertIsNone(invocation)
+
+    def test_empty_native_restore_fails_before_launch_without_replacement(self):
+        original = self.initial_launch()
+        requested = Path(original['env']['PI_SESSIONS']) / 'empty.jsonl'
+        requested.touch()
+        record = next((self.root / 'data/herdr-launches').glob('*.record'))
+        before_record = record.read_bytes()
+        before_herdr = self.herdr_calls()
+        before_sessions = {p.name: p.read_bytes() for p in requested.parent.iterdir()}
+        self.probes.unlink()
+        result, invocation = self.launch('--session', f"{original['env']['PI_SESSION_TARGET']}/empty.jsonl")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn('empty or unreadable session', result.stderr)
+        self.assertIsNone(invocation)
+        # Read-only image selection may run first; Compose and reporter must not.
+        probes = [json.loads(line) for line in self.probes.read_text().splitlines()]
+        self.assertTrue(all(probe[0] == 'image' for probe in probes))
+        self.assertEqual(self.herdr_calls(), before_herdr)
+        self.assertEqual(record.read_bytes(), before_record)
+        self.assertEqual({p.name: p.read_bytes() for p in requested.parent.iterdir()}, before_sessions)
 
     def test_conflicting_record_is_not_overwritten_or_executed(self):
         original = self.initial_launch()
@@ -745,7 +765,7 @@ class HerdrLauncherTest(unittest.TestCase):
         self.assertIn(str(selected).encode() + b'\0', record)
         self.assertNotIn(b'image', record)
         filename = 'linked.jsonl'
-        (Path(env['PI_SESSIONS']) / filename).touch()
+        (Path(env['PI_SESSIONS']) / filename).write_text('fixture conversation sentinel\n')
         result, restored = self.launch('--session', f"{env['PI_SESSION_TARGET']}/{filename}")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(restored['env']['PI_WORKDIR'], str(selected))
