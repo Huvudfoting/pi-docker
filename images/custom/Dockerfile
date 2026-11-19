@@ -25,6 +25,9 @@ RUN npm install -g \
     pi-ask-user@0.17.2 \
     @specode/pi-subscription-usage@1.5.0
 
+# Peers are host-supplied; without the flag npm bundles a duplicate ~160 MB Pi tree.
+RUN npm install -g --legacy-peer-deps @cad0p/pi-deepinfra-provider@0.1.5
+
 # Image-owned resources do not pollute mounted/shared Pi configuration.
 COPY custom/entrypoint /usr/local/bin/pi-custom
 COPY custom/AGENTS.md /usr/local/share/pi-custom/AGENTS.md

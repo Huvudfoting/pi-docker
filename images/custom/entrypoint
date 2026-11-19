@@ -6,5 +6,6 @@ exec pi \
   --extension /usr/local/lib/node_modules/pi-web-access \
   --extension /usr/local/lib/node_modules/pi-ask-user \
   --extension /usr/local/lib/node_modules/@specode/pi-subscription-usage \
+  --extension /usr/local/lib/node_modules/@cad0p/pi-deepinfra-provider \
   --skill /usr/local/share/pi-custom/skills \
   "$@"

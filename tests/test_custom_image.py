@@ -17,7 +17,8 @@ class CustomImageTest(unittest.TestCase):
         for required in ['git', 'gh', 'openssh-client', 'ripgrep', 'herdr --skill', '@earendil-works/pi-coding-agent']:
             self.assertIn(required, base)
         for optional in ['python:', '/uvx', 'pi-rewind-hook@', 'pi-web-access@', 'pi-ask-user@',
-                         'rpiv-ask-user-question@', 'pi-subscription-usage@', '        nano']:
+                         'rpiv-ask-user-question@', 'pi-subscription-usage@', 'pi-deepinfra-provider@',
+                         '        nano']:
             self.assertNotIn(optional, base)
         derived = (IMAGES / 'custom/Dockerfile').read_text()
         self.assertIn('ARG BASE_IMAGE=pi-docker:base', derived)
@@ -31,6 +32,7 @@ class CustomImageTest(unittest.TestCase):
         for package in ['pi-rewind-hook@1.8.8', 'pi-web-access@0.48.0',
                         'pi-ask-user@0.17.2', '@specode/pi-subscription-usage@1.5.0']:
             self.assertIn(package, derived)
+        self.assertIn('npm install -g --legacy-peer-deps @cad0p/pi-deepinfra-provider@0.1.5', derived)
         self.assertNotIn('@latest', derived)
 
     def test_reviewed_base_versions(self):
@@ -82,7 +84,7 @@ class CustomImageTest(unittest.TestCase):
             self.assertEqual(result.returncode, 17, result.stderr)
             actual = json.loads(log.read_text())
             self.assertEqual(actual[-len(args):], args)
-            self.assertEqual(actual.count('--extension'), 4)
+            self.assertEqual(actual.count('--extension'), 5)
             self.assertIn('/usr/local/lib/node_modules/pi-ask-user', actual)
             self.assertFalse(any('rpiv-ask-user-question' in arg for arg in actual))
             self.assertIn('/usr/local/share/pi-custom/AGENTS.md', actual)

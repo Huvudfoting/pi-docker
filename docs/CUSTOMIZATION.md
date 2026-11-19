@@ -69,13 +69,18 @@ are disabled. Install persistent global tools in images, not running containers.
 
 ## Optional extensions
 
-Custom installs/loads `pi-rewind-hook`, `pi-web-access`, `pi-ask-user`, and
-`@specode/pi-subscription-usage`. `pi-ask-user` provides the `ask_user` tool and
-emits the managed `herdr:blocked` events while waiting for input.
-They are **not required by Herdr**.
-See [usage-extension authentication](AUTHENTICATION.md#subscription-usage-extension).
+Custom installs/loads `pi-rewind-hook`, `pi-web-access`, `pi-ask-user`,
+`@specode/pi-subscription-usage`, and `@cad0p/pi-deepinfra-provider` (registers the
+`deepinfra` provider and catalog, so no `models.json` entry). `pi-ask-user` provides
+the `ask_user` tool and emits the managed `herdr:blocked` events while waiting for
+input. They are **not required by Herdr**.
+See [usage-extension authentication](AUTHENTICATION.md#subscription-usage-extension)
+and [DeepInfra authentication](AUTHENTICATION.md#deepinfra-provider-extension).
 Do not vendor upstream extensions into homemade folders or use runtime
-`pi install` for image-managed packages.
+`pi install` for image-managed packages. Install a package whose `peerDependencies`
+name host-supplied Pi packages with `npm install -g --legacy-peer-deps`; otherwise
+npm bundles a duplicate Pi tree. Review third-party extension source first: it runs
+inside Pi and can read credentials.
 
 The common launcher loads repository-owned `extensions/`; keep its manifest.
 The required Herdr reporter is separate and host-managed; see
