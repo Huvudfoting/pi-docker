@@ -207,7 +207,131 @@ implementation and reviewed host-validation gate are tracked below.
 
 ## Next-session handoff
 
-### Session pause: native protocol passed; select the next Phase 3 gate
+### Current task: automatic server-restart harness — implementation finished; execution approval pending
+
+The user requested continued Phase 3 implementation after selecting the design.
+`tests/host/prepare-server-restart.mjs` creates private unarmed ordinary/linked
+fixtures, copied/hashed deployment and private config/state/home, invoking only
+local fixture Git/mount discovery, never Herdr/Docker/Pi or image/version probes.
+Its fresh-shell wrapper and one-shot argv shim now retain both shim and parent-
+shell raw stat; preparation snapshots the validator, collector/state core,
+non-secret host tool paths and collector contract.
+`tests/session/restart-checkpoint.ts` retains startup history and checks open Pi
+against official settled identity; the seed instructions keep Pi running.
+
+New `tests/host/server-restart-evidence.mjs` is a read-only stopped-boundary
+validator and cross-lifetime saved-evidence assessor. It checks frozen inputs
+and pinned official reporter bytes, official refs/history/cwd/v3 storage, raw
+process lineage/new server and container lifetimes, exact native argv, fresh
+named host snapshots, explicit entry/stop approvals, ordered receipts, stopped
+persistence, socket absence, image consistency, visual/exit checks and empty historical container queries.
+It never executes commands, probes live state or writes/repairs evidence. Its
+synthetic-test core explicitly reports `inputsValidated: false`; only public
+wrappers validate input/reporter pins. Tests cannot be reported as a runtime
+restart pass. Collector contract: `tests/session/HERDR_SERVER_RESTART_EVIDENCE.md`;
+implementation status/design: `tests/session/HERDR_SERVER_RESTART_DESIGN.md`.
+Existing native harness, production launcher/records and reporter are unchanged.
+
+New `tests/host/server-restart-control.mjs` provides the controller/collector
+**core**: exclusive artifact/step/confirmation/query reservations; ordered
+append-only journal and fail-closed uncertainty; host/inherited-context and
+allowlisted private-environment guards; scoped read-only bounded CLI runner;
+version/local-Docker/image/empty-inventory/socket-length preflight; open runtime,
+stopped process/socket/archive and final-shell capture algorithms. Tests inject
+inert command/process/socket adapters. Captures explicitly do not validate inputs
+or attest live state. The CLI only supports offline `--inspect`; no live mutation
+or collection command is exposed. Preparation separately validates its frozen
+inputs without requiring an installer-produced reporter; this is not a gate.
+
+Public `validateCheckpoint` now checks open seed/restored evidence without
+requiring later boundaries. The user selected a **narrow pending-receipt API**:
+`validatePending` validates actual frozen inputs/reporter/evidence with exactly
+one proposed success row, never publishing it or granting re-entry authority.
+`StepLedger.confirmBoundary` hardwires checkpoint/stop/finish confirmation to
+that public validator, publishes only on success, then runs the ordinary saved-
+directory gate. Generic callback confirmation cannot handle those four stages.
+Required/validated publication proof binds the exact receipt and normal-gate
+status; missing/disagreeing proof, post-publication failure or crash blocks the
+next stage and retry. No injected validator, reader or hash can bypass pins.
+Raw synthetic helpers remain explicitly non-authoritative. These are tested
+saved-evidence/control algorithms, not an installed-reporter public runtime PASS.
+
+The user explicitly chose **two normal host terminals**: A keeps restored Pi
+visible and captures its actual immediate exit/foreground-shell marker; B stays
+outside Herdr for collection and confirmations. This avoids an additional restore
+detach/reattach boundary and adds no Herdr pane/workspace. The choice approves
+procedure design, NOT host execution.
+
+**Implementation finished; NOT AUTHORIZED FOR HOST EXECUTION.** New
+`tests/host/server-restart-live.mjs` completes guarded entry/stop/arming and all
+public gates, canonical host executable identity checks, same-owner private-root/
+Linux/nonroot/TTY/inherited-context checks, stable local Docker daemon/context,
+official private reporter installation, genuine foreground-ready proof, seed
+capture/detach/pre-stop recheck, separately approved fresh entry, visual answers
+and immediate builtin exit capture. Live commands require the explicit review
+flag and frozen fixture entry; mutations are one-shot and no cleanup is supplied.
+The shim now checks full pinned prerequisites/ledger/coherent phases before exec.
+The finish helper must be sourced as the FIRST command after /quit; it captures
+actual status and foreground stat before any child. This was tested on a real
+local PTY, without Herdr/Pi. Linked entry requires a completed ordinary public
+assessment, publication ledger and final client receipt. Offline pair assessment
+binds the independent cases and prerequisite; outputs never claim all Phase 3.
+
+Finished host procedure: `tests/session/HERDR_SERVER_RESTART_RUNBOOK.md`, copied
+and hashed as `control/runbook.md` in every new fixture. Preparation also freezes
+the live module and ready/finish helpers. `--plan` emits exact private paths,
+named targets and quoted commands WITHOUT invoking any live tools. Next action
+is independent review of a new host-prepared plan and separate explicit execution
+approval, then actual host runs/evidence review. No missing implementation stub
+remains; do not repeat completed native gates. The user asked to finish the work,
+not to execute it.
+Do not manually arm generated phase files or fabricate evidence. No server
+start/stop/restart, live API call, image operation or host test was performed or
+authorized; Phase 3 remains open and Phase 4 has not begun. All earlier user/
+agent changes remain un-staged; no staging or commits.
+
+Validation: **138 evidence-validator, 70 core and 22 live-workflow tests**;
+restart-specific suite **268 passed**; full session suite **308 passed, 1 skipped**
+(jq unavailable), with explicitly selected SHA-pinned upstream reporter SOURCE
+read as inert test data. Both complete ordinary/linked controller flows reach
+public saved-evidence success, including publication and client boundaries, with
+all runtime/installer I/O inert. Source is not vendored/executed and no official
+host installation/runtime is attested. Without that optional source asset the
+full suite reports **298 passed, 11 skipped**. Syntax/whitespace checks passed;
+no dependencies installed. These do not certify real Docker/Herdr behavior or
+successful public assessment with an actually installed official reporter. Preserve all current scripts/tests/docs;
+there are no new host fixtures to review or clean up.
+
+### Earlier selection: automatic server-restart restore design
+
+The user selected **designing the disposable server-restart test** as the next
+Phase 3 gate. Preparation/design only: no live restart, server/session creation,
+image change or host mutation is authorized. Source-reviewed design:
+`tests/session/HERDR_SERVER_RESTART_DESIGN.md`.
+
+The design reviews pinned Herdr 0.9.5 native planning, deferred fresh-shell
+startup, shutdown persistence and named-session/config isolation. Crucially,
+existing manual-reopen driver exports do not configure a restarted server's
+shell. The future harness must establish a private launcher environment before
+both server lifetimes, keep seed Pi alive at stop, and prove new server AND
+container identities plus unchanged official reference/history/cwd/v3 records.
+Proposed cases are independent ordinary and linked-subdirectory disposable
+sessions, with a human-approved stop boundary and no automatic retry/cleanup.
+
+**Next implementation:** build the separate preparation/entry/checkpoint/assessor
+harness and inert local tests described in that design, then present exact
+scripts and target for explicit host execution approval. No executable restart
+harness or runtime PASS exists yet. Existing completed gates need no repeat;
+Phase 3 remains open and Phase 4 has not begun. Git was clean at session start;
+older staged/untracked preservation notes below are historical, not current
+status. No live API request, Docker operation, restart, staging or commit was
+performed during this design work. Existing five-file Node regression suite:
+40 passed, 1 skipped (test-only jq unavailable); `git diff --check` passed.
+These checks exercise existing inert harness tests, not the proposed restart
+harness or any live restore. Only this plan, session README and the new design
+were changed.
+
+### Earlier session pause: native protocol passed; select the next Phase 3 gate
 
 The user requested a status reminder and a handoff to a new session. No further
 implementation, host run or live mutation is requested during this pause.
@@ -234,10 +358,10 @@ and assessment; no omitted-marker exception is needed. No repeat run is needed.
 **Remaining Phase 3:**
 - Actual automatic Herdr restoration after a server restart. The passed gate
   only exercised official reporting plus launcher reopen with --session; it did
-  not restart Herdr. Recommended next task is to design a reviewed disposable-
-  session restart test, but no restart test or host mutation is selected or
-  authorized by this handoff. Obtain explicit consent before preparing/executing
-  a procedure that restarts a server; never use an existing working session.
+  not restart Herdr. The user has now selected design of a reviewed disposable-
+  session restart test; see the current task and design above. Live execution
+  remains unauthorized. Obtain explicit consent before executing any procedure
+  that restarts a server; never use an existing working session.
 - Separate base-image runtime and real custom/base/custom conversation continuity.
   Existing image-switch unit tests are not runtime evidence. Do not pull, retag,
   remove images or alter availability without explicit user review/approval.

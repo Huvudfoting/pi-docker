@@ -13,7 +13,71 @@ Do not repeat completed gates to reconstruct them. No Docker cleanup/prune,
 worktree-metadata repair, staging or commit was performed; no current container
 inventory is claimed. No further cleanup is requested. See `PLAN.md` handoff.
 
-## Current blocker: same-pane lifecycle investigation
+## Current task: automatic server-restart harness implemented; execution approval pending
+
+The user selected design of the next Phase 3 gate and then continued
+implementation. See
+[HERDR_SERVER_RESTART_DESIGN.md](HERDR_SERVER_RESTART_DESIGN.md) for the pinned
+Herdr 0.9.5 contract, implemented harness and evidence matrix.
+Offline-only `../host/prepare-server-restart.mjs` now creates private unarmed
+ordinary/linked fixtures, hashed fresh-shell environment/shim and a non-live
+runbook without invoking Herdr/Docker/Pi. New `restart-checkpoint.ts` preserves
+startup history and checks the still-open seed without telling the user to quit.
+Read-only `../host/server-restart-evidence.mjs` now validates stopped persistence
+and cross-lifetime saved evidence, including raw process/argv/container/history
+and approval/exit receipts. Its public wrappers enforce frozen input hashes and
+pinned official reporter bytes; its synthetic-test core is explicitly not an
+execution gate. See the
+[collector contract](HERDR_SERVER_RESTART_EVIDENCE.md) for exact artifacts and
+limits. The shim also saves parent-shell stat for later ancestry verification;
+the validator additionally checks a fresh named host snapshot after each open
+checkpoint.
+
+New `../host/server-restart-control.mjs` implements a controller/collector **core**:
+exclusive artifact/step/query reservations, ordered journal, host/context/private-
+environment guards, scoped read-only bounded queries, initial version/image/
+empty-inventory/socket-length preflight and open/stopped/final-shell capture.
+Its only CLI mode is offline `--inspect`; no live workflow is exposed. Core
+capture is not full-input validation, live attestation or an execution gate.
+Preparation freezes this module and non-secret host tool-path metadata too.
+Public checkpoint validators now check seed/restored evidence without later
+artifacts. The user chose narrow pending-receipt validation before publication:
+`confirmBoundary` uses the full-input public pending validator, publishes success,
+then requires the normal saved-directory gate. Missing/mismatched publication
+proof or a crash blocks the next step. Generic callbacks cannot confirm data
+boundaries, and pending results alone never permit re-entry.
+The user chose **two normal host terminals**: A keeps restored Pi visible and
+captures the immediate shell return; B collects/confirms outside Herdr. This
+procedure decision does not authorize execution or create extra Herdr panes.
+
+The complete guarded workflow is now `../host/server-restart-live.mjs`. It
+implements private official installation, typed entry/stop/visual approvals,
+strict live host/tool/context/daemon checks, public entry and data-boundary gates,
+exclusive arming, genuine ready proof, seed/detach/pre-stop recheck, separate
+fresh automatic entry and immediate builtin exit capture. The shim checks full
+launch prerequisites; linked entry requires the completed ordinary proof.
+Every live command requires the review flag and frozen fixture entry. No retry,
+manual restored Pi command, repair or cleanup is provided. The finished
+[host runbook](HERDR_SERVER_RESTART_RUNBOOK.md) and ready/finish helpers are copied
+and hashed by preparation. `--plan` is offline and prints the exact private targets
+and commands for review. Sourcing `control/finish.sh` must be the FIRST shell
+command after /quit; no intervening source/echo/diagnostic is permitted.
+
+Local restart-specific tests, including new `test-server-restart-live.mjs`:
+**268 passed** with a separately selected SHA-pinned upstream reporter source
+asset read only as data in synthetic fixtures. Full suite: **308 passed, 1 skipped**
+(jq unavailable). Without that optional asset, ten full-pin simulations skip:
+**298 passed, 11 skipped**. Full public saved-evidence positives here use inert
+runtime/installer adapters, not an official host installation or real restart;
+no reporter source is vendored/executed and no live attestation is claimed.
+
+**IMPLEMENTATION FINISHED; NO HOST EXECUTION APPROVED OR RUN.** Next is review
+of a new host-prepared frozen plan, explicit execution approval, and actual host
+runs/evidence review. Do not arm phase files manually or import low-level helpers
+to bypass those boundaries. Completed native reopen gates below must not be
+rerun to reconstruct evidence. Phase 3 stays open.
+
+## Historical same-pane lifecycle investigation
 
 See [HERDR_SAME_PANE_ANALYSIS.md](HERDR_SAME_PANE_ANALYSIS.md) for tagged-source
 analysis of the saved stale A→B report. A new candidate cause is the driver's
