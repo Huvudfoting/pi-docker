@@ -87,7 +87,7 @@ The required Herdr reporter is separate and host-managed; see
 
 | Host/source | Container | Loading/scope |
 |---|---|---|
-| `data/config/settings.json`, `AGENTS.md` | `/pi/agent/` | Shared settings/instructions |
+| `data/config/settings.json` | `/pi/agent/` | Shared settings; Pi auto-loads `AGENTS.md` there if present |
 | `data/config/extensions/`, `data/config/skills/` | `/pi/agent/extensions/`, `/pi/agent/skills/` | Shared discovery |
 | `extensions/` | `/opt/pi-docker/extensions/` | Common launcher; read-only |
 | `<project>/.pi/` | `/workspace/.pi/` | Project settings/extensions/skills; subject to Pi trust |
