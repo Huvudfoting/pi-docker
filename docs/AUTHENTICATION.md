@@ -24,23 +24,6 @@ correct port and API path. Consult [installed Pi docs](CUSTOMIZATION.md#upstream
 for model schemas and API-key options. The launcher does not configure providers
 or manage model servers.
 
-### Subscription usage extension
-
-Custom includes `@specode/pi-subscription-usage`; base does not. For OpenAI
-usage reporting, sign in to both **OpenAI** and **OpenAI Codex (legacy)** with the
-same ChatGPT account/workspace. This extra login is not required by Pi or Herdr.
-For version-specific requirements, read the installed extension's `README.md` in
-`/usr/local/lib/node_modules/@specode/pi-subscription-usage/`.
-
-### DeepInfra provider extension
-
-Custom loads `@cad0p/pi-deepinfra-provider`, which registers the `deepinfra`
-provider and its public model catalog; base does not. In a
-`--image pi-docker:custom` container run `/login deepinfra`: the key persists in
-`data/config/auth.json`. `DEEPINFRA_API_KEY` is not forwarded by the launcher, and
-`PI_DEEPINFRA_FOOTER=off` requires a `compose.yaml` `environment:` entry. See
-[optional extensions](CUSTOMIZATION.md#optional-extensions).
-
 ## GitHub CLI (optional)
 
 Both images include `gh`. The launcher always mounts `data/gh-config/` read-only

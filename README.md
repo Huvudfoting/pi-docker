@@ -23,7 +23,8 @@ reachable; this project does not manage model servers.
 Without `--image` or `PI_DOCKER_IMAGE`, the launcher prefers local
 `pi-docker:custom`, otherwise `pi-docker:base`. See [usage](docs/USAGE.md#launching)
 for image-selection options. Base includes Pi, Node.js, and
-Herdr/GitHub tooling; custom adds Python, uv, nano, and optional extensions.
+Herdr/GitHub tooling; custom demonstrates extending it with a toolchain and
+runtime settings, optional extensions, instructions, and a skill.
 See [image customization](docs/CUSTOMIZATION.md#two-images).
 
 **Security:** This is not a hardened sandbox. Containers can write the project
