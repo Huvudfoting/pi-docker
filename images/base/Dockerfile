@@ -12,7 +12,6 @@ RUN apt-get update \
         gh \
         curl \
         ca-certificates \
-        libstdc++6 \
         openssh-client \
         ripgrep \
     && rm -rf /var/lib/apt/lists/*
