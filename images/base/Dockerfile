@@ -2,7 +2,7 @@
 FROM node:24-bookworm-slim
 
 # Update image-managed versions here; host Herdr is managed separately.
-ARG PI_VERSION=1.5.2
+ARG PI_VERSION=1.6.0
 ARG HERDR_VERSION=0.9.5
 
 # Install .deb packages

@@ -20,7 +20,7 @@ RUN apt-get update \
 
 # Pin reviewed extension releases; changing a version also invalidates this layer.
 RUN npm install -g \
-    pi-rewind-hook@1.8.8 \
+    pi-rewind-hook@1.8.9 \
     pi-web-access@0.48.0 \
     pi-ask-user@0.17.2 \
     @specode/pi-subscription-usage@1.5.0

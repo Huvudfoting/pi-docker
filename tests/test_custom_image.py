@@ -29,7 +29,7 @@ class CustomImageTest(unittest.TestCase):
         self.assertIn('python3 -c', derived)
         self.assertIn('COPY custom/skills/', derived)
         self.assertNotIn('rpiv-ask-user-question', derived)
-        for package in ['pi-rewind-hook@1.8.8', 'pi-web-access@0.48.0',
+        for package in ['pi-rewind-hook@1.8.9', 'pi-web-access@0.48.0',
                         'pi-ask-user@0.17.2', '@specode/pi-subscription-usage@1.5.0']:
             self.assertIn(package, derived)
         self.assertIn('npm install -g --legacy-peer-deps @cad0p/pi-deepinfra-provider@0.1.5', derived)
@@ -37,7 +37,7 @@ class CustomImageTest(unittest.TestCase):
 
     def test_reviewed_base_versions(self):
         base = (IMAGES / 'base/Dockerfile').read_text()
-        self.assertIn('ARG PI_VERSION=1.5.2', base)
+        self.assertIn('ARG PI_VERSION=1.6.0', base)
         self.assertIn('ARG HERDR_VERSION=0.9.5', base)
 
     def test_self_update_guard_is_image_owned_inherited_and_refuses_updates(self):
