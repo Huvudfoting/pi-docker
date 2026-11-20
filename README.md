@@ -33,7 +33,7 @@ Use `--no-herdr` to disable integration. Read [setup and security](docs/SETUP.md
 
 ## Guides
 
-- [Setup](docs/SETUP.md): requirements, installation, mounts, security, migration.
+- [Setup](docs/SETUP.md): requirements, installation, mounts, security.
 - [Usage](docs/USAGE.md): launcher options and conversations.
 - [Authentication](docs/AUTHENTICATION.md): providers and GitHub credentials.
 - [Herdr](docs/HERDR_INTEGRATION.md): helpers, restore, diagnostics.

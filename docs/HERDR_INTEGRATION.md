@@ -66,11 +66,9 @@ with `data/sessions/`. Missing records/workspaces/sessions abort rather than
 create a replacement. `/pi/herdr-sessions/<key>/` paths belong to the restore
 protocol; do not construct them manually.
 
-Image tags have distinct restore keys. New launches use `pi-docker:base` or the
-selected image; v1 legacy records still select `pi-agent:latest`. Keep or alias
-old tags as described in [migration](SETUP.md#migrating-the-old-layout).
-Tags remain mutable. Conversation storage is still selected
-by workspace/name, so switching images does not isolate conversations or files.
+Image tags have distinct restore keys and remain mutable. Conversation storage
+is still selected by workspace/name, so switching images does not isolate
+conversations or files.
 
 ## Maintenance and diagnostics
 

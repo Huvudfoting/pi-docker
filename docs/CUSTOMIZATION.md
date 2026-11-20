@@ -115,7 +115,6 @@ in the derived image; do not remove the host-managed Herdr reporter.
 
 Mounted source may be newer than an image. Editing custom source does not
 replace its baked-in resources; `/reload` alone cannot apply those host edits.
-See [migration](SETUP.md#migrating-the-old-layout) for old paths and image tags.
 
 ## Updating image-managed packages
 

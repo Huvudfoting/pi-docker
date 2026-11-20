@@ -68,27 +68,6 @@ file. Mounted source may be newer than the image. Builds use only `images/`,
 with a narrow allowlist in `images/.dockerignore`; custom copies its own resources.
 Never bind the repository root at `/opt/pi-docker`: it contains private state.
 
-## Migrating the old layout
-
-Replace the old `setup/bin/pi` launcher symlink with `bin/pi` using step 2 above.
-Rebuild base, then custom, and restart containers to refresh the deployment mounts.
-Build tags are now `pi-docker:base` and `pi-docker:custom`. Use `./bin/build custom`
-in place of the old personal variant, and update any exported `PI_DOCKER_IMAGE`
-or `PI_DOCKER_BASE_IMAGE` to the new tags. Private `data/` stays in place; do not
-move or regenerate it.
-
-Restore records retain old image references. Keep the old images or deliberately
-alias the rebuilt ones on the host if you want old records to use the new builds:
-
-```bash
-docker tag pi-docker:base pi-agent:latest
-docker tag pi-docker:custom pi-agent:custom
-docker tag pi-docker:custom pi-agent:personal
-```
-
-New image tags have new restore keys, but workspace/name conversation storage is
-unchanged. Do not rewrite existing records or their keys.
-
 ## Security and concurrency
 
 - This is filesystem/process isolation, **not a hardened sandbox**. Agents can
@@ -100,9 +79,9 @@ unchanged. Do not rewrite existing records or their keys.
   restrict the upstream socket API.
 - Pi, extensions, and tools can read mounted credentials. Read-only prevents
   modification through that mount, not disclosure or remote API writes.
-- Keep secrets only in private `data/`, not deployment paths. Mounting this repository root as the project also
-  exposes private `data/` through writable `/workspace`; choose a narrower project
-  when possible. Back up credentials, sessions, and restore records privately.
+- Keep secrets only in private `data/`, not deployment paths. Mounting this
+  repository root as the project also exposes private `data/` through writable
+  `/workspace`; choose a narrower project when possible. Back up credentials, sessions, and restore records privately.
 - Containers/images do not isolate shared configuration or concurrent checkout
   writes. Use separate worktrees for writing agents and avoid concurrent credential
   refresh/configuration changes. See [credential handling](AUTHENTICATION.md).

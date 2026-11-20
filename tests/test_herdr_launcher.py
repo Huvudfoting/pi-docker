@@ -5,7 +5,6 @@ The real Herdr launch/restart trial still runs on the host.
 """
 
 from concurrent.futures import ThreadPoolExecutor
-import hashlib
 import json
 import os
 from pathlib import Path
@@ -201,20 +200,17 @@ class HerdrLauncherTest(unittest.TestCase):
         self.assertFalse((self.root / 'data/sessions').exists())
         self.assertFalse((self.root / 'data/herdr-launches').exists())
 
-    def test_native_restore_preserves_new_and_legacy_image_records(self):
+    def test_native_restore_records_select_image(self):
         self.env.pop('MISSING_IMAGE')
         result, original = self.launch(self.project, '--name', 'backend', '--image', 'pi-docker:base', '--herdr')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(original['env']['PI_DOCKER_IMAGE'], 'pi-docker:base')
         filename = 'image-test.jsonl'
-        # Old v1 keys and v2 literal image references must both stay usable.
-        for image in ['pi-docker:custom', 'pi-agent:latest', 'pi-agent:custom', 'pi-agent:personal']:
+        # Every tag gets an image-aware namespace and restores with its recorded image.
+        for image in ['pi-docker:custom', 'my-pi:dev']:
             result, selected = self.launch(self.project, '--name', 'backend', '--image', image, '--herdr')
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertNotEqual(original['env']['PI_SESSION_TARGET'], selected['env']['PI_SESSION_TARGET'])
-            if image == 'pi-agent:latest':
-                legacy_key = hashlib.sha256(f'{self.project}\0backend'.encode()).hexdigest()
-                self.assertEqual(selected['env']['PI_SESSION_TARGET'], f'/pi/herdr-sessions/{legacy_key}')
             (Path(selected['env']['PI_SESSIONS']) / filename).touch()
             result, restored = self.launch('--session', f"{selected['env']['PI_SESSION_TARGET']}/{filename}",
                                           env={**self.env, 'PI_DOCKER_IMAGE': 'unrelated:latest'})
@@ -222,9 +218,8 @@ class HerdrLauncherTest(unittest.TestCase):
             self.assertEqual(restored['env']['PI_DOCKER_IMAGE'], image)
             self.assertEqual(restored['env']['PI_SESSION_TARGET'], selected['env']['PI_SESSION_TARGET'])
         records = [r.read_bytes() for r in (self.root / 'data/herdr-launches').glob('*.record')]
-        self.assertTrue(any(r.startswith(b'pi-docker-herdr-v1\0') for r in records))
-        self.assertTrue(any(r.endswith(b'pi-agent:custom\0') for r in records))
-        self.assertTrue(any(r.startswith(b'pi-docker-herdr-v2\0') and r.endswith(b'pi-docker:base\0') for r in records))
+        self.assertTrue(all(r.startswith(b'pi-docker-herdr-v2\0') for r in records))
+        self.assertTrue(any(r.endswith(b'pi-docker:base\0') for r in records))
         result, restored = self.launch('--session', f"{original['env']['PI_SESSION_TARGET']}/{filename}",
                                       env={**self.env, 'PI_DOCKER_IMAGE': 'pi-docker:custom'})
         self.assertEqual(result.returncode, 0, result.stderr)
