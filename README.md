@@ -56,3 +56,5 @@ python3 -m unittest discover -s tests -p 'test_*.py'
 ```
 
 Adapter tests skip without Node.js. Neither runtime is needed on the host to launch Pi.
+
+Licensed under the MIT License; see `LICENSE`.
