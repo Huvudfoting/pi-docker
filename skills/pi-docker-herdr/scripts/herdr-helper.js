@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Narrow Docker-Pi start/ask adapter. Node built-ins only; no persistent state
+// Docker-Pi helper adapter. Node built-ins only; no persistent state
 // or raw socket client. All remote operations go through the official CLI.
 "use strict";
 const fs = require("node:fs");
@@ -190,6 +190,10 @@ class Workflow {
     // Do not rewrite env, select another server, or probe to identify context.
     if (this.args.deadline_seconds < 1 || this.args.deadline_seconds > 360 || this.args.timeout_ms < 1 || this.args.timeout_ms > 300000)
       this.fail("invalid_input", "deadline-seconds must be 1..360; timeout-ms must be 1..300000");
+    if (this.args.operation === "remove") {
+      if (!matches(/^w[0-9]+$/, this.args.workspace)) this.fail("invalid_input", "workspace must be an explicit wN ID");
+      return;
+    }
     if (this.args.operation === "start") {
       const root = env.PI_DOCKER_HOST_WORKSPACE || "";
       if (!path.isAbsolute(root) || /[\x00-\x1f\x7f]/.test(root))
@@ -204,6 +208,78 @@ class Workflow {
     if (this.args.lines < 1 || this.args.lines > 120) this.fail("invalid_input", "lines must be 1..120");
   }
 
+  async step(name, argv) {
+    const r = this.receipt;
+    r.steps ??= [];
+    const step = { operation: name, status: "uncertain" };
+    r.steps.push(step);
+    r.stage = name;
+    try {
+      const result = await this.call(argv, { effect: "mutation", limit: this.remaining() });
+      step.status = "confirmed_success";
+      step.result = result;
+      r.mutation = `${name}_confirmed`;
+      return result;
+    } catch (error) {
+      // A timeout, lost response or generic CLI failure is not proof of rejection.
+      if (error instanceof Failure && error.detail.upstream) step.status = "confirmed_failure";
+      throw error;
+    }
+  }
+
+  async worktree(root) {
+    const r = this.receipt;
+    r.stage = "discover_parent";
+    const listing = await this.call(["worktree", "list", "--cwd", root]);
+    const source = listing.source;
+    if (!object(source) || !path.isAbsolute(source.source_checkout_path || "") ||
+        /[\x00-\x1f\x7f]/.test(source.source_checkout_path))
+      this.fail("malformed_response", "worktree listing has no usable parent checkout provenance");
+    r.source = source;
+    const argv = ["worktree", this.args.worktree, "--cwd", source.source_checkout_path, "--no-focus"];
+    for (const key of ["branch", "base", "path", "label"]) {
+      if (this.args[key] !== undefined) argv.push(`--${key}`, this.args[key]);
+    }
+    const result = await this.step(`worktree_${this.args.worktree}`, argv);
+    // Retain partial identities even if the remainder of the response is invalid.
+    r.workspace = result.workspace ?? null;
+    r.worktree = result.worktree ?? null;
+    r.pane_id = result.root_pane?.pane_id ?? null;
+    r.already_open = result.already_open ?? false;
+    if (!/^w[0-9]+$/.test(r.workspace?.workspace_id || "") || !matches(PANE, r.pane_id) ||
+        !path.isAbsolute(r.worktree?.path || "") || /[\x00-\x1f\x7f]/.test(r.worktree.path))
+      this.fail("malformed_response", "worktree operation returned incomplete workspace/checkout/pane identities");
+    if (!r.pane_id.startsWith(`${r.workspace.workspace_id}:`) || r.pane_id === process.env.HERDR_PANE_ID)
+      this.fail("malformed_response", "worktree operation returned an inconsistent or caller pane");
+    r.host_workspace = r.worktree.path;
+    r.stage = "check_pane";
+    const pane = (await this.call(["pane", "get", r.pane_id])).pane;
+    const info = (await this.call(["pane", "process-info", "--pane", r.pane_id])).process_info;
+    if (!object(pane) || pane.pane_id !== r.pane_id || pane.agent !== null || !object(info) ||
+        info.pane_id !== r.pane_id || !Number.isSafeInteger(info.shell_pid) || info.shell_pid <= 0 ||
+        info.foreground_process_group_id !== info.shell_pid || !Array.isArray(info.foreground_processes) ||
+        info.foreground_processes.length !== 1 || info.foreground_processes[0]?.pid !== info.shell_pid)
+      this.fail("pane_occupied", "returned worktree pane is not an available foreground shell; left unchanged");
+    // Herdr agent start performs the final interactive-prompt check atomically.
+    return r.host_workspace;
+  }
+
+  async remove() {
+    const r = this.receipt;
+    r.stage = "inspect_removal";
+    const workspace = (await this.call(["workspace", "get", this.args.workspace])).workspace;
+    r.workspace = workspace ?? null;
+    const wt = workspace?.worktree;
+    if (workspace?.workspace_id !== this.args.workspace || wt?.is_linked_worktree !== true ||
+        !path.isAbsolute(wt.checkout_path || ""))
+      this.fail("invalid_target", "remove requires an open Herdr-managed linked-worktree workspace");
+    r.host_workspace = wt.checkout_path;
+    const result = await this.step("worktree_remove", ["worktree", "remove", "--workspace", this.args.workspace]);
+    if (result.workspace_id !== this.args.workspace || result.path !== wt.checkout_path || result.forced !== false)
+      this.fail("malformed_response", "removal returned unexpected identity; inspect before recovery");
+    r.mutation = "worktree_removed";
+  }
+
   async start(root) {
     const r = this.receipt;
     r.requested_name = this.args.name;
@@ -212,24 +288,29 @@ class Workflow {
     const agents = (await this.call(["agent", "list"])).agents;
     if (!Array.isArray(agents) || !agents.every(object)) this.fail("malformed_response", "missing agent list");
     if (agents.some(a => a.name === this.args.name)) this.fail("duplicate_name", "live agent name already exists; no pane created");
-    let direction = this.args.direction;
-    if (direction === "auto") {
-      r.stage = "layout";
-      const layout = (await this.call(["pane", "layout", "--pane", process.env.HERDR_PANE_ID])).layout;
-      const pane = object(layout) && Array.isArray(layout.panes) && layout.panes.find(p => object(p) && p.pane_id === process.env.HERDR_PANE_ID);
-      const width = pane?.rect?.width, height = pane?.rect?.height;
-      if (![width, height].every(n => typeof n === "number" && Number.isFinite(n) && n > 0))
-        this.fail("malformed_response", "caller pane geometry missing/invalid");
-      direction = width >= 80 && width >= height * 2 ? "right" : "down";
+    if (this.args.worktree) {
+      root = await this.worktree(root);
+    } else {
+      let direction = this.args.direction;
+      if (direction === "auto") {
+        r.stage = "layout";
+        const layout = (await this.call(["pane", "layout", "--pane", process.env.HERDR_PANE_ID])).layout;
+        const pane = object(layout) && Array.isArray(layout.panes) && layout.panes.find(p => object(p) && p.pane_id === process.env.HERDR_PANE_ID);
+        const width = pane?.rect?.width, height = pane?.rect?.height;
+        if (![width, height].every(n => typeof n === "number" && Number.isFinite(n) && n > 0))
+          this.fail("malformed_response", "caller pane geometry missing/invalid");
+        direction = width >= 80 && width >= height * 2 ? "right" : "down";
+      }
+      r.direction = direction;
+      r.stage = "split";
+      const result = await this.call(["pane", "split", "--current", "--direction", direction, "--cwd", root, "--no-focus"], { effect: "mutation" });
+      const pane = object(result.pane) ? result.pane.pane_id : null;
+      if (!matches(PANE, pane)) this.fail("malformed_response", "split returned no valid pane ID; creation uncertain");
+      r.pane_id = pane; // Retain immediately, before startup or further validation.
+      r.mutation = "pane_created";
+      if (pane === process.env.HERDR_PANE_ID) this.fail("malformed_response", "split returned caller pane; refusing startup");
     }
-    r.direction = direction;
-    r.stage = "split";
-    const result = await this.call(["pane", "split", "--current", "--direction", direction, "--cwd", root, "--no-focus"], { effect: "mutation" });
-    const pane = object(result.pane) ? result.pane.pane_id : null;
-    if (!matches(PANE, pane)) this.fail("malformed_response", "split returned no valid pane ID; creation uncertain");
-    r.pane_id = pane; // Retain immediately, before startup or further validation.
-    r.mutation = "pane_created";
-    if (pane === process.env.HERDR_PANE_ID) this.fail("malformed_response", "split returned caller pane; refusing startup");
+    const pane = r.pane_id;
     r.stage = "start";
     const budget = Math.min(this.args.timeout_ms, Math.max(1, Math.floor((this.remaining() - .1) * 1000)));
     const started = await this.call(["agent", "start", this.args.name, "--kind", "pi", "--pane", pane,
@@ -270,7 +351,9 @@ class Workflow {
   async run() {
     try {
       const root = this.validate();
-      if (this.args.operation === "start") await this.start(root); else await this.ask();
+      if (this.args.operation === "start") await this.start(root);
+      else if (this.args.operation === "remove") await this.remove();
+      else await this.ask();
       Object.assign(this.receipt, { status: "success", stage: "complete" });
     } catch (error) {
       if (!(error instanceof Failure)) throw error;
@@ -292,9 +375,13 @@ class Workflow {
 }
 
 const HELP = `Usage: herdr-helper.js start --name NAME [--direction auto|right|down]
+       herdr-helper.js start --name NAME --worktree create [--branch NAME] [--base REF] [--path HOST_PATH] [--label TEXT]
+       herdr-helper.js start --name NAME --worktree open --fresh (--path HOST_PATH | --branch NAME) [--label TEXT]
+       herdr-helper.js remove --workspace wN
        herdr-helper.js ask --target NAME_OR_PANE --prompt TEXT [--lines N]
-Both commands: --timeout-ms N (default 120000), --deadline-seconds N (default 150)
-Narrow Docker-Pi start/ask adapter. Requires inherited Herdr context.
+All commands: --timeout-ms N (default 120000), --deadline-seconds N (default 150)
+Requires inherited Herdr context. No force, automatic retry or cleanup.
+Existing-worktree automatic conversation selection is not implemented yet; open requires --fresh.
 `;
 function parse(argv) {
   if (["-h", "--help"].includes(argv[0])) {
@@ -303,14 +390,17 @@ function parse(argv) {
   }
   const operation = argv[0];
   const invalid = message => { throw new Failure("invalid_arguments", message); };
-  if (!["start", "ask"].includes(operation)) invalid("expected start or ask");
+  if (!["start", "ask", "remove"].includes(operation)) invalid("expected start, ask or remove");
   const args = { operation, timeout_ms: 120000, deadline_seconds: 150, ...(operation === "start" ? { direction: "auto" } : { lines: 40 }) };
-  const allowed = new Set(["timeout-ms", "deadline-seconds", ...(operation === "start" ? ["name", "direction"] : ["target", "prompt", "lines"])]);
+  const allowed = new Set(["timeout-ms", "deadline-seconds", ...(operation === "start"
+    ? ["name", "direction", "worktree", "branch", "base", "path", "label"]
+    : operation === "remove" ? ["workspace"] : ["target", "prompt", "lines"])]);
   for (let i = 1; i < argv.length; i++) {
     if (["-h", "--help"].includes(argv[i])) {
       process.stdout.write(HELP);
       return null;
     }
+    if (argv[i] === "--fresh" && operation === "start") { args.fresh = true; continue; }
     const match = /^--([^=]+)(?:=([\s\S]*))?$/.exec(argv[i]);
     if (!match || !allowed.has(match[1])) invalid(`unrecognized argument: ${argv[i]}`);
     const key = match[1].replaceAll("-", "_");
@@ -321,10 +411,24 @@ function parse(argv) {
     if (integer && (!/^[+-]?\d+$/.test(value) || !Number.isSafeInteger(Number(value)))) invalid(`--${match[1]} needs an integer`);
     args[key] = integer ? Number(value) : value;
   }
-  for (const key of operation === "start" ? ["name"] : ["target", "prompt"]) {
+  for (const key of operation === "start" ? ["name"] : operation === "remove" ? ["workspace"] : ["target", "prompt"]) {
     if (args[key] === undefined) invalid(`--${key} is required`);
   }
   if (operation === "start" && !["auto", "right", "down"].includes(args.direction)) invalid("direction must be auto, right, or down");
+  if (operation === "start") {
+    if (args.worktree !== undefined && !["create", "open"].includes(args.worktree)) invalid("worktree must be create or open");
+    if (args.worktree && argv.some(a => a === "--direction" || a.startsWith("--direction=")))
+      invalid("worktrees use grouped workspaces, not sibling directions");
+    if (!args.worktree && ["branch", "base", "path", "label", "fresh"].some(k => args[k] !== undefined))
+      invalid("worktree options require --worktree create or open");
+    for (const key of ["branch", "base", "path", "label"]) {
+      if (args[key] !== undefined && (!args[key].trim() || /[\x00-\x1f\x7f]/.test(args[key]))) invalid(`invalid --${key}`);
+    }
+    if (args.path !== undefined && !path.isAbsolute(args.path)) invalid("--path must be an absolute host checkout path");
+    if (args.worktree === "open" && (!args.fresh || args.base !== undefined || Boolean(args.path) === Boolean(args.branch)))
+      invalid("open requires --fresh, exactly one of --path/--branch, and no --base");
+    if (args.worktree === "create" && args.fresh) invalid("--fresh is only needed for open");
+  }
   return args;
 }
 

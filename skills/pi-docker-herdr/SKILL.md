@@ -1,6 +1,6 @@
 ---
 name: pi-docker-herdr
-description: Start Pi Docker helpers or ask a ready peer in an integrated Herdr session. Adds host-path handling and bounded receipts to the official Herdr skill.
+description: Start shared-checkout or Herdr worktree Pi Docker helpers, remove explicitly selected worktrees, or ask a ready peer. Adds host paths and bounded receipts to the official Herdr skill.
 ---
 
 # Pi Docker helper adapter
@@ -25,6 +25,51 @@ Clarify ambiguity. It accepts only `idle`/`done`, `interactive_ready`, non-pendi
 peers, rejects the caller itself, and is not a queue. Keep one outstanding request
 per peer.
 
+## Isolated worktree helpers (shelved experiment)
+
+This branch retains incomplete experimental support. The worktree effort is
+shelved; do not resume development or run worktree smoke tests implicitly.
+The orchestration has not been verified live. Shared-checkout helpers remain
+the established workflow. Archived conclusions are in the repository's `PLAN.md`,
+which is not mounted at `/opt/pi-docker` in agent containers.
+
+Only use worktree mode when the user requests isolation. Shared siblings remain
+the default. Herdr creates/opens grouped workspaces, not sibling panes:
+
+```bash
+node /opt/pi-docker/skills/pi-docker-herdr/scripts/herdr-helper.js start \
+  --name implementer --worktree create --branch feature-example
+node /opt/pi-docker/skills/pi-docker-herdr/scripts/herdr-helper.js start \
+  --name reviewer --worktree open --path /absolute/host/checkout --fresh
+```
+
+Create accepts optional `--branch`, `--base`, `--path` and `--label`; omitted
+choices use Herdr defaults. Open accepts exactly one of `--path` or `--branch`,
+plus optional `--label`. Paths must be absolute **host** paths. Do not combine
+worktree mode with `--direction`. Parent discovery uses Herdr's provenance even
+when the caller is in a linked checkout. Focus is preserved. The returned root
+pane is inspected for occupancy before startup; if occupied, leave it alone.
+
+**Current limitation:** open starts a fresh conversation and requires `--fresh`
+to acknowledge that. Automatic latest-conversation selection across storage
+names and helper resume are not yet implemented. Do not present open as resume;
+use the host launcher's existing native restore workflow for an exact session.
+
+Remove only after an explicit user request identifying the exact open linked
+workspace (discover it with Herdr's read-only worktree listing):
+
+```bash
+node /opt/pi-docker/skills/pi-docker-herdr/scripts/herdr-helper.js remove --workspace w2
+```
+
+Removal inspects that workspace and delegates to Herdr without force. A closed
+checkout must be explicitly opened through Herdr first; do not start an agent
+merely to remove it. Branches and Docker-Pi conversation storage are retained.
+Dirty-worktree or other refusals are reported, not bypassed. No automatic cleanup.
+
+Be aware: all agents in the same repository share read/write Git metadata,
+including objects, refs and configuration, even when using different worktrees.
+
 ## Boundaries
 
 - Preserve inherited `HERDR_ENV=1`, `HERDR_PANE_ID`, and the existing socket at
@@ -40,6 +85,10 @@ per peer.
   built-ins and the official CLI, with no Python/npm dependencies.
 
 ## Receipts and recovery
+
+Worktree mutations also return `steps` with confirmed success/failure or uncertain
+outcomes and returned identities, plus `workspace`, `worktree` and parent `source`
+when known. Later startup failure does not undo creation or opening.
 
 Read the JSON receipt: `status`, `stage`, `pane_id`, `agent`, `mutation`, `startup`,
 `delivery`, output, and errors. Preserve known identities/upstream errors.
@@ -57,12 +106,17 @@ or clean up a pane.
 | Option | Command | Default / constraint |
 |---|---|---|
 | `--name` | start | Required; `[a-z][a-z0-9_-]{0,31}`, not already live |
-| `--direction` | start | `auto`, `right`, `down` |
+| `--direction` | shared start | `auto`, `right`, `down` |
+| `--worktree` | start | `create` or `open`; omitted = shared checkout |
+| `--branch`, `--path`, `--label` | worktree start | Herdr options; path is an absolute host path |
+| `--base` | worktree create | Herdr base ref |
+| `--fresh` | worktree open | Required; helper resume is not implemented |
+| `--workspace` | remove | Required exact open linked workspace ID |
 | `--target` | ask | Required live name or `wN:pN` |
 | `--prompt` | ask | Required nonblank text; maximum 32 KiB UTF-8 |
 | `--lines` | ask | 40; range 1–120 |
-| `--timeout-ms` | both | 120000; range 1–300000 |
-| `--deadline-seconds` | both | 150; range 1–360 |
+| `--timeout-ms` | all | 120000; range 1–300000 |
+| `--deadline-seconds` | all | 150; range 1–360 |
 
 The absolute deadline covers the whole workflow; increasing the wait cap does
 not extend it. Output caps: requested lines/16 KiB; diagnostics: 12 lines/2 KiB.

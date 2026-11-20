@@ -40,8 +40,22 @@ Ask Pi, for example:
 
 Integrated launches advertise the official operating skill and Docker adapter
 skill, loading instructions on demand. The Node.js adapter needs no Python or
-extra npm dependencies. It starts a focus-preserving sibling or submits once to
-an explicit ready peer. General inspection/terminal control stays with upstream.
+extra npm dependencies. The established workflow starts a focus-preserving
+shared-checkout sibling or submits once to an explicit ready peer. General
+inspection/terminal control stays with upstream.
+
+**Shelved experiment:** this branch also retains worktree create/open/start and
+explicit removal support. It is incomplete and the new orchestration has not been
+verified live. Do not treat it as the established helper workflow. See the
+[archived conclusions](../PLAN.md) for status and design findings.
+
+Worktree helpers use Herdr's parent provenance and returned checkout/pane IDs,
+refuse occupied panes, and retain step receipts on failure. No automatic force,
+retry or cleanup is performed. Worktree removal retains branches and Docker-Pi
+conversations. Existing-worktree helper resume/latest-history selection is not
+implemented: the adapter requires `--fresh` for worktree open. See the
+[adapter skill](../skills/pi-docker-herdr/SKILL.md#isolated-worktree-helpers) for
+commands and limitations.
 
 Helpers use `PI_DOCKER_HOST_WORKSPACE`, the exact selected canonical host
 directory—even from a container subdirectory. They do not inherit or forward an
@@ -76,8 +90,9 @@ conversation storage and restore reference. Older v1/v2 records/references are
 unsupported, without migration or compatibility loaders. Existing files are not
 deleted; see [format transition](SETUP.md#migrating-the-old-layout).
 
-The mounting/format foundation is implemented; live persistence/native-restore
-validation remains a separate integration gate. Pi 1.5.2's interactive missing-cwd
+Production mounts, persistence and ordinary/linked native reopen have been
+exercised on the host; automatic restore after an actual Herdr server restart
+has not yet been verified. Pi 1.5.2's interactive missing-cwd
 Continue/Fork/Cancel recovery is not a Docker-Pi restore fallback: a missing
 recorded host directory fails before starting the container. A surviving host
 selection can nevertheless rediscover a different container cwd (for example,
@@ -86,7 +101,7 @@ session-header cwd does not follow that change: explicit reopen may fail or show
 Pi's missing-cwd UI, while `--continue` may start separate history. Continuity
 across such layout changes is unsupported under the current policy; no header
 rewriting, historical layout state or migration is performed. See the
-[offline probe results](../tests/session/README.md#follow-up-offline-probes-cwd-transitions-and-unusable-explicit-sessions).
+[archived conclusions](../PLAN.md#mount-and-conversation-conclusions).
 
 ## Maintenance and diagnostics
 

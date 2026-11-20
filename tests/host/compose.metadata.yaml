@@ -1,8 +1,0 @@
-services:
-  probe:
-    volumes:
-      - type: bind
-        source: "${PROBE_COMMON:?}"
-        target: "${PROBE_COMMON:?}"
-        bind:
-          create_host_path: false

@@ -29,7 +29,9 @@ See [image customization](docs/CUSTOMIZATION.md#two-images).
 Existing linked worktrees use path-preserving checkout/Git-metadata mounts;
 ordinary directories keep `/workspace`. Host Git is required for Git-marked
 selections, but not marker-free ordinary directories. See
-[mount policy](docs/SETUP.md#worktree-mount-policy).
+[mount policy](docs/SETUP.md#worktree-mount-policy). The Herdr-managed isolated-helper
+worktree effort is **shelved on this branch**, not complete; retained implementation,
+findings and limitations are summarized in the [archived conclusions](PLAN.md).
 
 **Security:** This is not a hardened sandbox. Containers can write the project
 and read mounted credentials; networking is shared with the host. Eligible
@@ -47,18 +49,13 @@ Use `--no-herdr` to disable integration. Read [setup and security](docs/SETUP.md
 
 Guide commands run on the host from this repository root unless marked otherwise.
 
-## Repository and tests
+## Repository layout
 
 Host tooling lives in `bin/` and `lib/`, build recipes in `images/`, and shared
 resources in `extensions/` and `skills/`. Builds use only `images/`; containers
 mount allowlisted deployment paths at `/opt/pi-docker`, not the repository root.
 Private state lives in ignored `data/`: **back it up privately; never publish it.**
 
-Run offline checks with Python 3 and Node.js; no live Docker or Herdr is needed:
-
-```bash
-python3 -m unittest discover -s tests -p 'test_*.py'
-```
-
-Adapter tests skip without Node.js; Herdr contract-harness tests need test-only
-`jq`. Neither Python nor Node is needed on the host to launch Pi.
+Tests and experimental validation scaffolding have been removed from this branch.
+Prior conclusions and unverified behavior are recorded in [PLAN.md](PLAN.md).
+Neither Python nor Node is needed on the host to launch Pi.

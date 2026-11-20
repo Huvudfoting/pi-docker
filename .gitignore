@@ -4,5 +4,5 @@
 .env.*
 !.env.example
 
-# Local Python launcher checks.
+# Local bytecode caches.
 __pycache__/
