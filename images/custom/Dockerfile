@@ -18,11 +18,15 @@ RUN apt-get update \
         liblzma5 libncursesw6 libreadline8 libsqlite3-0 libssl3 libuuid1 zlib1g \
     && rm -rf /var/lib/apt/lists/*
 
+# Pin reviewed extension releases; changing a version also invalidates this layer.
 RUN npm install -g \
-    pi-rewind-hook@latest \
-    pi-web-access@latest \
-    pi-ask-user@latest \
-    @specode/pi-subscription-usage@latest
+    pi-rewind-hook@1.8.9 \
+    pi-web-access@0.48.0 \
+    pi-ask-user@0.17.2 \
+    @specode/pi-subscription-usage@1.5.0
+
+# Peers are host-supplied; without the flag npm bundles a duplicate ~160 MB Pi tree.
+RUN npm install -g --legacy-peer-deps @cad0p/pi-deepinfra-provider@0.1.5
 
 # Image-owned resources do not pollute mounted/shared Pi configuration.
 COPY custom/entrypoint /usr/local/bin/pi-custom

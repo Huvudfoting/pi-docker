@@ -66,13 +66,18 @@ are disabled. Install persistent global tools in images, not running containers.
 
 ## Optional extensions
 
-Custom installs/loads `pi-rewind-hook`, `pi-web-access`, `pi-ask-user`, and
-`@specode/pi-subscription-usage`. `pi-ask-user` provides the `ask_user` tool and
-emits the managed `herdr:blocked` events while waiting for input.
-They are **not required by Herdr**. The example uses `@latest`; pin versions for
-reproducibility. See [usage-extension authentication](AUTHENTICATION.md#subscription-usage-extension).
+Custom installs/loads `pi-rewind-hook`, `pi-web-access`, `pi-ask-user`,
+`@specode/pi-subscription-usage`, and `@cad0p/pi-deepinfra-provider` (registers the
+`deepinfra` provider and catalog, so no `models.json` entry). `pi-ask-user` provides
+the `ask_user` tool and emits the managed `herdr:blocked` events while waiting for
+input. They are **not required by Herdr**.
+See [usage-extension authentication](AUTHENTICATION.md#subscription-usage-extension)
+and [DeepInfra authentication](AUTHENTICATION.md#deepinfra-provider-extension).
 Do not vendor upstream extensions into homemade folders or use runtime
-`pi install` for image-managed packages.
+`pi install` for image-managed packages. Install a package whose `peerDependencies`
+name host-supplied Pi packages with `npm install -g --legacy-peer-deps`; otherwise
+npm bundles a duplicate Pi tree. Review third-party extension source first: it runs
+inside Pi and can read credentials.
 
 The common launcher loads repository-owned `extensions/`; keep its manifest.
 The required Herdr reporter is separate and host-managed; see
@@ -82,7 +87,7 @@ The required Herdr reporter is separate and host-managed; see
 
 | Host/source | Container | Loading/scope |
 |---|---|---|
-| `data/config/settings.json`, `AGENTS.md` | `/pi/agent/` | Shared settings/instructions |
+| `data/config/settings.json` | `/pi/agent/` | Shared settings; Pi auto-loads `AGENTS.md` there if present |
 | `data/config/extensions/`, `data/config/skills/` | `/pi/agent/extensions/`, `/pi/agent/skills/` | Shared discovery |
 | `extensions/` | `/opt/pi-docker/extensions/` | Common launcher; read-only |
 | `<project>/.pi/` | `/workspace/.pi/` | Project settings/extensions/skills; subject to Pi trust |
@@ -110,13 +115,15 @@ in the derived image; do not remove the host-managed Herdr reporter.
 
 Mounted source may be newer than an image. Editing custom source does not
 replace its baked-in resources; `/reload` alone cannot apply those host edits.
-See [migration](SETUP.md#migrating-the-old-layout) for old paths and image tags.
 
 ## Updating image-managed packages
 
 Update `PI_VERSION` and `HERDR_VERSION` in `images/base/Dockerfile`. Their pinned
 defaults also apply to direct Docker builds; `bin/build` only selects the recipe
 and tag. Host Herdr and its server are separate; no automatic alignment or restart.
+
+Extension versions may be pinned in `images/custom/Dockerfile`; update them
+there and rebuild, not in shared configuration.
 
 Base sets `PI_SELF_UPDATE_COMMAND` to an image-local guard, inherited by custom.
 When Pi would self-update, it refuses and prints host rebuild instructions with a

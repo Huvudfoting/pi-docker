@@ -6,3 +6,7 @@
 
 # Local Python launcher checks.
 __pycache__/
+
+
+# Temp
+.scratch/*

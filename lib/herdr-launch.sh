@@ -9,11 +9,8 @@ readonly HERDR_EXTENSION="$root/data/config/extensions/herdr-agent-state.ts"
 readonly HERDR_INSTALL_COMMAND='bin/herdr-extension install'
 
 herdr_storage_key() {
-  # Only the historical pi-agent:latest uses image-less v1 keys.
-  # Every other tag (including pi-docker:base) gets an image-aware v2 namespace.
-  { printf '%s\0%s' "$workspace" "$name"
-    if [[ "$image" != pi-agent:latest ]]; then printf '\0%s' "$image"; fi
-  } | sha256sum | cut -d' ' -f1
+  # Every image tag gets an image-aware v2 namespace.
+  printf '%s\0%s\0%s' "$workspace" "$name" "$image" | sha256sum | cut -d' ' -f1
 }
 
 herdr_is_restore_request() {
@@ -49,7 +46,6 @@ herdr_load_restore() {
     IFS= read -r -d '' version && IFS= read -r -d '' workspace && IFS= read -r -d '' name \
       || fail "Incomplete Herdr launch record: $record"
     case "$version" in
-      pi-docker-herdr-v1) image=pi-agent:latest ;;
       pi-docker-herdr-v2)
         IFS= read -r -d '' image || fail "Incomplete Herdr launch record: $record" ;;
       *) fail "Invalid Herdr launch record: $record" ;;
@@ -134,12 +130,7 @@ herdr_save_record() (
   mkdir -p "$HERDR_RECORDS"
   temporary="$(mktemp "$HERDR_RECORDS/.launch.XXXXXX")"
   trap 'rm -f -- "$temporary"' EXIT
-  if [[ "$image" == pi-agent:latest ]]; then
-    # Preserve v1 serialization only for explicit legacy-image launches.
-    printf '%s\0%s\0%s\0' pi-docker-herdr-v1 "$workspace" "$name" > "$temporary"
-  else
-    printf '%s\0%s\0%s\0%s\0' pi-docker-herdr-v2 "$workspace" "$name" "$image" > "$temporary"
-  fi
+  printf '%s\0%s\0%s\0%s\0' pi-docker-herdr-v2 "$workspace" "$name" "$image" > "$temporary"
   if [[ -e "$record" ]] && ! cmp -s -- "$temporary" "$record"; then
     fail "Conflicting Herdr launch record: $record"
   fi
