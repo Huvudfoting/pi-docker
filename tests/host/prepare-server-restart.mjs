@@ -136,9 +136,12 @@ IFS= read -r __phase3_stat < /proc/$$/stat || return
 ${quote(process.execPath)} ${quote(root + '/control/server-restart-live.mjs')} finish ${quote(root)} --execute-reviewed-procedure --shell-stat "$__phase3_stat" --exit-status "$__phase3_exit"
 `);
     writeInput('data/config/auth.json', '{}\n');
+    // Pi 1.5.2 records its changelog version on first TUI startup. Preseed it
+    // before hashing. Match SettingsManager's pretty JSON/no trailing newline
+    // serialization so an identical-value save also preserves the frozen bytes.
     writeInput('data/config/settings.json', JSON.stringify({ packages: [], defaultProvider: 'pi-docker-fixture',
       defaultModel: 'fixed', defaultTools: [], compaction: { enabled: false }, retry: { enabled: false },
-      enableAnalytics: false, enableInstallTelemetry: false }) + '\n');
+      enableAnalytics: false, enableInstallTelemetry: false, lastChangelogVersion: '1.5.2' }, null, 2));
     writeInput('data/config/phase3-fixture', 'pi-docker-phase3-fixture\n');
     writeInput('data/config/phase3-restart', 'pi-docker-phase3-restart\n');
     // Mutable stage is intentionally unarmed. Only the guarded frozen controller
@@ -168,7 +171,9 @@ services:
     labels:
       pi-docker.phase3-run: "\${PHASE3_PROJECT:?}"
 `);
-    writeInput('herdr-config/herdr/config.toml', `[session]\nresume_agents_on_restore = true\n[terminal]\ndefault_shell = ${JSON.stringify(path.join(root, 'control/shell'))}\nshell_mode = "non_login"\n`);
+    // Herdr 0.9.5 persists onboarding=false when setup completes. Disable it
+    // before freezing inputs so first entry does not rewrite the pinned config.
+    writeInput('herdr-config/herdr/config.toml', `onboarding = false\n[session]\nresume_agents_on_restore = true\n[terminal]\ndefault_shell = ${JSON.stringify(path.join(root, 'control/shell'))}\nshell_mode = "non_login"\n`);
     writeInput('control/environment.sh', `# TEST ONLY; source in the fixture server entry and every fresh pane shell.
 [[ -d ${quote(root)} && ! -L ${quote(root)} ]] || { printf 'STOP: fixture path changed\\n' >&2; return 1; }
 ${quote(sha256sum)} --check --status ${quote(path.join(root, 'inputs.sha256'))} || { printf 'STOP: fixture inputs changed\\n' >&2; return 1; }

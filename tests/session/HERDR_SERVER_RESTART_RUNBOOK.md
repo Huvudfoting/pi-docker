@@ -32,6 +32,27 @@ The source/version observations and evidence trust limits are in
 `HERDR_SERVER_RESTART_DESIGN.md` and `HERDR_SERVER_RESTART_EVIDENCE.md`. Saved
 artifacts and human observations are trusted evidence, not adversarial attestation.
 
+### Known failed attempts: preserve both; never repair/reuse
+
+Preserve `/tmp/pi-docker-restart.FopIIj` / `pi-restart-fopiij`, including its
+open Pi. Ready and the reported seed checkpoint succeeded, but collection
+rejected immutable settings after Pi added `lastChangelogVersion: "1.5.2"` and
+reformatted JSON. No stop or restore was reached. Corrected preparation now
+includes that marker before hashing and uses Pi's exact two-space JSON/no-final-
+newline format. See the design's startup-write audit. Do not detach, quit, edit,
+re-hash, stop or clean up this failed fixture implicitly. A new plan requires
+new target-specific approval.
+
+Earlier first attempt:
+
+Preserve `/tmp/pi-docker-restart.dyN3HI` / `pi-restart-dyn3hi` unchanged. Its
+approved first entry opened a shell, but ready rejected the immutable config
+because onboarding completion added `onboarding = false`. No seed/restart was
+reached. Corrected preparation includes this setting before hashing. Do not
+edit/re-hash/resume that old fixture or stop/delete its resources implicitly.
+Use a fresh fixture with a newly reviewed plan and approval. This is not evidence
+of successful automatic restore.
+
 ## 1. Prepare and review — NO live tools or server probes
 
 From your actual deployment checkout on the host (not the container's `/workspace`):
@@ -111,8 +132,11 @@ B now runs the plan's `terminalB.separatelyApprovedStop`. This is **not chained*
 from collection. It rechecks the actual old server, official settled identity,
 exact current history/record, sole running run/project container and image bytes,
 then displays the exact private target and asks for the session name and note.
-Only that confirmation permits **one** `herdr session stop <exact-name>` under
-the fixture's private XDG environment. No broad/default/focused stop is available.
+After confirmation it repeats the public seed/input/ledger and daemon checks,
+then checks the actual old process/socket and unchanged data again before **one**
+`herdr session stop <exact-name>` under the fixture's private XDG environment.
+Root ownership/0700 and tool SHA256 must still match. A prompt-time change is a
+STOP without issuing the mutation. No broad/default/focused stop is available.
 
 The controller saves the real bounded stop result, waits boundedly for the old
 process lifetime and both private sockets to disappear, requires empty run and
@@ -128,8 +152,11 @@ After successful stop and separate fresh-entry approval, run
 `terminalA.restoredEntry` from the same ordinary host terminal. The controller
 requires the public saved stop gate and strict ledger, fresh absence probes,
 empty inventories, unchanged local daemon/tool/image identities, and a new typed
-name/note. It then arms restored observation and opens the same private named
-session once, with the same established environment.
+name/note. After that prompt it repeats the public stop/input/ledger gate and
+fresh daemon/context, boot/old-process, socket, inventory and image checks.
+Only then does it arm restored observation, revalidate the frozen inputs/tools
+and private root, and open the same private named session once with the same
+established environment. Approval is not permission to use changed prerequisites.
 
 **Herdr must automatically launch Pi. Do not type any Pi shell launch command.**
 Wait for the original title and complete original conversation to appear. No old
@@ -207,6 +234,6 @@ For full-input positive simulations, optionally supply
 `PI_RESTART_TEST_REPORTER_SOURCE=/absolute/path/to/reviewed/upstream/src/integration/assets/pi/herdr-agent-state.ts`.
 The file is read as data, must match the independently pinned SHA256, is never
 executed or vendored, and is copied only into test-owned synthetic fixtures by an
-inert installer stand-in. Without it those ten cases skip explicitly. Their
+inert installer stand-in. Without it those 28 cases skip explicitly. Their
 public saved-evidence success is **not** an official installer run, a real Herdr
 restart, a live inherited-context assertion or a host execution approval.

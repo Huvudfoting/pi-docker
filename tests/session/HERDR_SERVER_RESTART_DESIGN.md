@@ -1,6 +1,22 @@
 # Phase 3: disposable automatic server-restart restore — design
 
-Status: **GUARDED HARNESS IMPLEMENTED; AWAITING PROCEDURE REVIEW/EXECUTION APPROVAL.**
+Status: **SECOND ORDINARY HOST ATTEMPT BLOCKED; STARTUP INITIALIZATION FIX/AUDIT.**
+The user-approved `/tmp/pi-docker-restart.FopIIj` (`pi-restart-fopiij`) passed
+ready, opened Pi and reported the seed checkpoint saved. Collection rejected
+changed immutable settings after Pi added `lastChangelogVersion: "1.5.2"` and
+pretty-serialized the JSON. The user chose fixing this and auditing startup
+writes before another fresh fixture. Preserve its open Pi and BOTH failed
+fixtures/sessions without detach, quit, stop, repair or cleanup. Preparation now
+pre-seeds the marker and uses exact SDK save serialization. See the audit below.
+
+Earlier first attempt:
+User-approved `/tmp/pi-docker-restart.dyN3HI` (`pi-restart-dyn3hi`) opened its
+initial shell but ready rejected the config after Herdr added `onboarding = false`.
+Pinned 0.9.5 `client/shell/overlay_input.rs::complete_onboarding` performs exactly
+that write. Preparation now disables onboarding before hashing, and tests assert
+exact top-level TOML for both cases. Preserve the failed fixture/server untouched;
+no seed Pi or restart was reached. The user chose a fresh fixture, whose exact
+plan requires new approval. Do not repair/re-hash/resume the failed attempt.
 The user requested finishing implementation, not executing a restart. The complete
 host procedure is [HERDR_SERVER_RESTART_RUNBOOK.md](HERDR_SERVER_RESTART_RUNBOOK.md).
 Neither document authorizes stopping a server. Phase 3 remains open; the real
@@ -73,32 +89,97 @@ restart gate is NOT RUN. Existing native launcher-protocol passes need no rerun.
 **Remaining:** independent review and explicit approval of a newly prepared host
 plan, followed by the actual ordinary/linked host runs and evidence review. No
 implementation stub or missing live step remains. Runtime behavior is untested:
-all controller execution here used inert substitutes, never real Herdr/Docker/Pi.
+agent-side tests used inert substitutes, never real Herdr/Docker/Pi. The user
+host attempt above reached only initial entry and the blocked ready check.
 Do not manually arm, repair, retry, clean up or import low-level helpers to bypass
 the guarded procedure. The complete CLI is not permission to execute it. No real
 server restart, image runtime or continuity PASS can be inferred from unit tests.
+
+Safety review completed (static/inert only):
+- Repeat the public stopped-evidence gate and strict ledger after fresh-entry
+  approval, not only before the potentially long human prompt. Recheck the local
+  daemon/context, boot/old lifetime, both sockets, both inventories and image
+  selection before arming/attaching. A changed history/record/persistence cannot
+  be hidden by starting a new server first.
+- Repeat the seed public gate and daemon check after stop approval, then check the
+  old process/socket/data immediately before the exact named stop. Revalidate
+  frozen inputs and tools immediately before private installation and attachment.
+- Recheck same-owner mode-0700 root protection after approvals and before arming,
+  installation, attachment or stop. Tool checks enforce the recorded SHA256 as
+  well as inode/size/timestamps and PATH resolution.
+- Eighteen prompt-time drift regressions cover these boundaries; the executable
+  test also rejects a wrong digest even when filesystem metadata is unchanged.
+  No live mutation was used to verify these safeguards. This is not atomic
+  check-to-exec isolation against a malicious/concurrent same-user actor; the
+  reviewed procedure prohibits concurrent fixture/configuration edits.
 
 Local checks (no host runtime claims):
 
 ```bash
 node --test tests/session/test-server-restart-preparation.mjs \
   tests/session/test-restart-checkpoint.mjs \
+  tests/session/test-restart-settings.mjs \
   tests/session/test-server-restart-evidence.mjs \
   tests/session/test-server-restart-control.mjs \
   tests/session/test-server-restart-live.mjs
 ```
 
-Validation: **138 evidence-validator, 70 core and 22 live-workflow tests**;
-restart-specific suite **268 passed** and full session suite **308 passed,
+Validation: **138 evidence-validator, 70 core, 40 live-workflow and 5 SDK settings
+tests**; restart-specific suite **291 passed** and full session suite **331 passed,
 1 skipped** with the explicitly selected, SHA-pinned upstream reporter source
-asset read as inert test data (jq unavailable). Without that asset, ten full-pin
-simulations skip explicitly: full suite **298 passed, 11 skipped**. No reporter
+asset read as inert test data (jq unavailable). Without that asset, 28 full-pin
+simulations skip explicitly: full suite **303 passed, 29 skipped**. No reporter
 source is vendored or executed, no real official installer is run by tests, and
 public synthetic saved-evidence success still reports no live attestation or
 Phase 3 completion. No dependencies were installed.
 
 Next: present the frozen plan/runbook for explicit host execution approval. Do not
 run it here or repeat previously completed native gates.
+
+## Pi 1.5.2 startup-write audit
+
+Scope: installed package `@earendil-works/pi-coding-agent` version 1.5.2; its
+`dist/main.js`, `cli/startup-ui.js`, `modes/interactive/interactive-mode.js` and
+core settings/resource/package/agent-session paths. No live Pi CLI/TUI, model,
+network, Herdr or Docker execution was used for this audit. This is not a claim
+that arbitrary extensions/images can never write settings.
+
+- `getChangelogForDisplay` records VERSION on a fresh session if its marker is
+  missing/unreadable/older. Pre-seed `lastChangelogVersion: "1.5.2"`. Resumed
+  sessions with messages skip this startup path.
+- `SettingsManager.persistScopedSettings` writes `JSON.stringify(value, null, 2)`
+  with NO trailing newline. Generate those exact bytes initially: an
+  identical-value model/version save must not invalidate the immutable hash.
+  Load/migration alone does not persist; the fixture has no legacy queueMode,
+  websockets, skills-object or retry.maxDelayMs migration keys.
+- First-time theme/analytics setup requires a missing settings file, experimental
+  features and no custom agent directory. The fixture supplies an existing file
+  and private agent-dir override, so both guards independently suppress setup.
+- Extension changelog writes apply to package-origin extensions with package
+  version/changelog metadata. Fixture packages are empty; its extensions are
+  loose auto/CLI resources. Unexpected packaged extensions remain outside this
+  audit and may trigger the strict guard rather than being silently accepted.
+- Project trust changes visibility in memory, not the global settings file.
+  Package install/remove and interactive theme/model/thinking/settings changes
+  can persist settings, but are not part of the approved test commands. There
+  are no CLI model/thinking overrides in the exact seed/native-restore argv.
+- Analytics/install telemetry are disabled and PI_OFFLINE is set; no auth/login
+  flow or transported model call is used. Device IDs are generated on explicit
+  auth/provider paths, not by merely loading the fixture settings.
+
+Five `test-restart-settings.mjs` cases exercise the REAL installed SettingsManager
+against newly allocated test-only directories. Narrowly extracted installed
+startup method bodies run in a VM with intercepted telemetry, actual changelog
+parsing and only controlled resource descriptors; full UI/auth/model modules are
+not imported. Tests reproduce the pre-fix rewrite, prove ordinary/linked byte
+stability through startup/trust/identical-value persistence and resumed startup,
+prove first-time setup guards, and prove semantic drift is still rejected by the
+public immutable-input validator. No existing fixture or credential file is read.
+The five cases skip explicitly if the installed 1.5.2 SDK is unavailable; an
+explicit `PI_RESTART_TEST_PI_ROOT` override must exist and match that version.
+
+No in-place repair or hash exemption is introduced. Actual host continuity still
+requires a fresh reviewed/approved fixture and real runtime evidence.
 
 ## Scope and success claim
 

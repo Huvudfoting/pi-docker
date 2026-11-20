@@ -207,7 +207,173 @@ implementation and reviewed host-validation gate are tracked below.
 
 ## Next-session handoff
 
-### Current task: automatic server-restart harness — implementation finished; execution approval pending
+### Session-end handoff — create a NEW host `/tmp` fixture next session
+
+**Restart gate NOT PASSED. Phase 3 remains open; Phase 4 has not begun.**
+The session ended after two real host attempts exposed first-run initialization
+writes. Both preparation fixes and the startup audit are implemented/tested.
+A third fixture has NOT been reported or approved. Do not reuse either old
+fixture, repair its hashes, or reconstruct/rerun completed native gates.
+
+#### Start here next session
+
+1. Read this handoff and `tests/session/HERDR_SERVER_RESTART_RUNBOOK.md`, plus the
+   design's startup-write audit. Preserve all existing working-tree changes;
+   do not stage, commit, reset, clean Git or repair/remove repository worktrees.
+2. Ask whether the user completed the **user-managed host cleanup** below.
+   The user's last message was: "I will stop their processes and delete data
+   under host /tmp". Completion was NOT reported. Do not recreate old sessions
+   to check them. If cleanup is incomplete, verify actual host state and assist
+   only within the two exact approved targets. Cleanup is never a test PASS.
+3. From the actual deployment checkout in a normal HOST terminal outside Herdr,
+   create a completely new fixture under host `/tmp` (not this container's `/tmp`):
+   `/usr/bin/node tests/host/prepare-server-restart.mjs --prepare --case ordinary --parent /tmp`.
+   Do not guess the host checkout from container `/workspace`. Preparation invokes
+   no Herdr/Docker/Pi or image probes; retain the newly printed exact path.
+4. Verify the new config has top-level `onboarding = false`; settings must already
+   have `lastChangelogVersion: "1.5.2"` and canonical two-space JSON with no final
+   newline. Run that fixture's frozen `server-restart-live.mjs --plan NEW_ROOT`.
+   Review its actual session/name/paths/input hash, then obtain explicit approval
+   for THAT new target. Prior ordinary approvals do not transfer to it.
+5. Guide the user **ONE COMMAND AT A TIME**, waiting for each result. Use explicit
+   Bash backslash continuations for long host commands: an earlier pasted line
+   split the review flag into a separate command (parser rejected before any live
+   action). Two normal host terminals per new case, no extra Herdr topology.
+6. Follow the frozen runbook: entry -> genuine ready -> separate foreground Pi ->
+   `/name` -> exact offline seed -> checkpoint -> B collection -> A detach only
+   after collection/client success -> exact named stop -> separately gated fresh
+   entry -> AUTOMATIC Pi only -> new turn/checkpoint -> visual/exit capture.
+   `/quit` must be followed IMMEDIATELY by sourcing the frozen finish helper as
+   the FIRST shell command. Do not manually reopen, repair, retry or auto-chain.
+7. Ordinary must finish and be reviewed before a separately prepared/approved
+   linked fixture. Do not build/pull/retag images, remove volumes, or infer all
+   Phase 3 gates complete from this single test. Any unexpected mutation is STOP.
+
+#### Host cleanup requested at session end — PENDING, not performed here
+
+The user explicitly selected cleanup including BOTH failed host runs, then
+volunteered to stop their processes and delete their host `/tmp` data themselves.
+**Owner: user; completion UNCONFIRMED at handoff.** The agent advised limiting
+removal to the two exact fixture roots after their sessions/containers stop,
+never all of `/tmp`. This supersedes earlier preserve-only instructions **for
+scoped cleanup only**, not for resuming either test or deleting unrelated
+resources. Do not assume the two directories or resources still exist next time.
+
+| Exact host fixture | Exact session / Compose project / run-label value | Last USER-reported state |
+| --- | --- | --- |
+| `/tmp/pi-docker-restart.dyN3HI` | `pi-restart-dyn3hi` | Herdr shell open; ready blocked on config hash; no Pi seed |
+| `/tmp/pi-docker-restart.FopIIj` | `pi-restart-fopiij` | Herdr/Pi open; seed checkpoint saved; B collection blocked on settings hash |
+
+Neither directory is mounted/visible inside this agent container. No host
+shutdown, container removal or fixture-directory removal was performed here.
+Do not claim cleanup complete. Do not kill broad PID sets, remove sockets by
+hand, use `docker ... prune`, or touch `default`/working sessions. Never source
+an old fixture's environment helper or invoke its gated test `stop` to bypass
+its failed hashes/incomplete lifecycle; no cleanup helper is supplied.
+
+Host-side cleanup next session must first verify the exact original private
+XDG/session directories, same-user ownership and existing resource identities.
+Use read-only observations, not attach (which can start a missing server).
+Confirm the original local Docker endpoint/context/daemon from each fixture's
+`logs/daemon.json` and `logs/host-tools.json` before targeting containers; do not
+silently substitute today's default daemon. Host credential contents are never
+needed. Use the real host CLI with the fixture's private configuration to stop
+ONLY the exact named sessions, and inspect containers under BOTH exact filters
+`pi-docker.phase3-run=<project>` and `com.docker.compose.project=<project>`.
+Only matching, verified full container IDs are in cleanup scope. If graceful
+shutdown leaves containers, handle those explicitly/boundedly; no blind retry or
+unrelated removal. Only after server/socket disappearance and empty matching
+inventories may the exact fixture directories be removed. If identities or
+scope are uncertain, ask the user and leave cleanup pending. Retain completed
+native gate reports, source changes, shared configuration, images and volumes.
+
+#### Implemented fixes, tests, and remaining limits
+
+- Herdr 0.9.5 first-run onboarding writes `onboarding = false`; generate it BEFORE
+  freezing TOML. Exact config assertions cover ordinary AND linked preparation.
+- Pi 1.5.2 first TUI startup writes a missing changelog version. Preseed
+  `lastChangelogVersion: "1.5.2"` and generate exact SDK save serialization
+  (`JSON.stringify(settings, null, 2)`, NO trailing newline). Do NOT make settings
+  mutable or weaken the hash gate. Both failures were preparation omissions.
+- `test-restart-settings.mjs` adds five installed-SDK tests, without a Pi process,
+  TUI, model, network or live Herdr/Docker: reproduces the old write, validates
+  ordinary/linked byte stability through startup and same-value persistence,
+  tests first-time setup guards, and proves real settings drift is rejected.
+  See the design for startup migrations/package/trust/telemetry audit limits.
+- Latest full suite with SHA-pinned upstream reporter source used as DATA only:
+  **331 passed, 1 skipped** (jq unavailable), 332 total. Default suite with the
+  installed Pi 1.5.2 SDK: **303 passed, 29 skipped**; 28 simulations need the
+  optional reporter source. Five SDK cases skip explicitly if 1.5.2 is absent;
+  no installation is attempted. Restart-specific total: **291 passed**.
+  Syntax and tracked/new-test whitespace checks passed. No dependencies installed.
+- Reproduce default tests with `node --test tests/session/test-*.mjs`.
+  Optional `PI_RESTART_TEST_REPORTER_SOURCE` must name bytes matching reporter
+  SHA256 `2c5272d732b475bbf91a027203b1f98d25fe43d2c1402530a442b288aeaca1e4`.
+  The current cached upstream clone is retained under
+  `/tmp/pi-github-repos/runtime-wG7Piv/43f99b34c6aa8ada5399c5bec0a712cd380e5ff87ae6a39404b6b16fbf946eee`,
+  asset `src/integration/assets/pi/herdr-agent-state.ts`, pinned Herdr commit
+  `2ecf19a92fc3a7fff75b6ce3655ef04f4625ec01`. It may be absent in a fresh container;
+  never substitute a fake reporter or vendor it to manufacture runtime authority.
+- Local cleanup COMPLETED: removed 14 explicitly named, same-user/single-link
+  regular transient test-output logs from container `/tmp` after recording their
+  results here (review, onboarding and startup-audit output, plus earlier unit
+  suite logs). Do not rely on those old log paths next session. No host process,
+  container or fixture directory was stopped/removed by the agent. Kept the
+  upstream source cache, source changes and completed native gate evidence.
+  All project edits remain unstaged; this agent made no repository commit.
+
+Current changed files: `PLAN.md`, `tests/host/prepare-server-restart.mjs`,
+`tests/host/server-restart-live.mjs`, session design/evidence/runbook/README,
+`test-server-restart-live.mjs`, `test-server-restart-preparation.mjs`, and new
+untracked `tests/session/test-restart-settings.mjs`. The controller/evidence/core
+and checkpoint foundations already exist; preserve them and all prior user work.
+
+#### Earlier host outcome details: Pi first-run settings write
+
+User approved all stages for `/tmp/pi-docker-restart.FopIIj`, session
+`pi-restart-fopiij`, manifest SHA256
+`72221d283e0e47d68436e2529ffdb0842b830f3a759e7a8456377e498af9c104`.
+With onboarding disabled initially, entry/ready and Pi launch succeeded. The user
+reported the exact seed response and `Restart seed checkpoint saved` notification.
+Terminal B `collect-seed` then rejected changed immutable
+`data/config/settings.json`. Supplied settings retain the original values but
+add `lastChangelogVersion: "1.5.2"` and use Pi's pretty JSON serialization.
+No seed collection confirmation, named stop or automatic restore was reached.
+
+User chose fixing initialization AND auditing startup writes before another host
+attempt. Preparation now seeds the changelog version before hashing and uses
+Pi 1.5.2's two-space JSON/no-final-newline save format. Five new SDK audit tests
+use the installed 1.5.2 SettingsManager and narrowly extracted startup methods:
+reproduce the legacy write, preserve frozen ordinary/linked settings through
+startup and identical-value saves, prove first-time setup skips the private
+config, and still reject real settings drift. No Pi process, model, network,
+Herdr or Docker was run by this agent. See the design's startup-write audit.
+
+At the time of failure both fixtures were to be preserved, with no in-place
+repair/re-hash/resume. At session end the user explicitly requested scoped
+cleanup; see the authoritative pending-host-cleanup section above. A new test
+still requires a NEW fixture, reviewed plan and target-specific approval.
+
+#### Earlier host attempt: onboarding config write
+
+User approved all ordinary stages for `/tmp/pi-docker-restart.dyN3HI`, session
+`pi-restart-dyn3hi`, manifest SHA256
+`88eb114c1d4483dbebfd98bdcf89352e4262360e93dd8951f0ce834a2e02dc9c`.
+Initial entry opened a Herdr shell. `restart_ready` then stopped with
+`changed immutable input: herdr-config/herdr/config.toml`; user-provided config
+shows Herdr added top-level `onboarding = false`. Pinned 0.9.5 onboarding
+completion code performs that write. This exposed a preparation bug, NOT a
+continuity PASS: Pi seed, server stop and restart were not reached.
+
+User explicitly chose fixing preparation and using a fresh fixture. New configs
+set `onboarding = false` BEFORE hashing; ordinary/linked preparation assertions
+pin the exact complete TOML. Do not relax hashes, edit/re-hash/resume the failed
+fixture, stop its server, or clean it up implicitly. Preserve it and its host
+state; this agent cannot directly inspect that host-only directory. Next prepare
+a fresh host fixture one command at a time, review its new plan and obtain its
+own execution approval. Approval of dyN3HI does not transfer to a new target.
+
+#### Earlier pre-host implementation checkpoint (historical)
 
 The user requested continued Phase 3 implementation after selecting the design.
 `tests/host/prepare-server-restart.mjs` creates private unarmed ordinary/linked
@@ -285,19 +451,29 @@ is independent review of a new host-prepared plan and separate explicit executio
 approval, then actual host runs/evidence review. No missing implementation stub
 remains; do not repeat completed native gates. The user asked to finish the work,
 not to execute it.
+
+Final static/inert safety review closed approval-gap drift: after human approval,
+repeat public evidence/strict ledger checks and fresh daemon/context, boot/old
+process, socket, image and inventory observations before entry. Repeat seed/
+input/daemon validation before stop, and frozen inputs/tools before installer or
+attach. Recheck private root ownership/0700 and enforce tool SHA256, not just
+metadata. Eighteen prompt-time drift regressions require rejection before any
+installer/stop/new-client action. No check-to-exec isolation against malicious
+same-user concurrent edits is claimed; those edits remain prohibited.
 Do not manually arm generated phase files or fabricate evidence. No server
 start/stop/restart, live API call, image operation or host test was performed or
 authorized; Phase 3 remains open and Phase 4 has not begun. All earlier user/
 agent changes remain un-staged; no staging or commits.
 
-Validation: **138 evidence-validator, 70 core and 22 live-workflow tests**;
-restart-specific suite **268 passed**; full session suite **308 passed, 1 skipped**
+Latest validation: **138 evidence-validator, 70 core, 40 live-workflow and 5 SDK
+settings tests**; restart-specific suite **291 passed**; full session suite
+**331 passed, 1 skipped**
 (jq unavailable), with explicitly selected SHA-pinned upstream reporter SOURCE
 read as inert test data. Both complete ordinary/linked controller flows reach
 public saved-evidence success, including publication and client boundaries, with
 all runtime/installer I/O inert. Source is not vendored/executed and no official
 host installation/runtime is attested. Without that optional source asset the
-full suite reports **298 passed, 11 skipped**. Syntax/whitespace checks passed;
+full suite reports **303 passed, 29 skipped**. Syntax/whitespace checks passed;
 no dependencies installed. These do not certify real Docker/Herdr behavior or
 successful public assessment with an actually installed official reporter. Preserve all current scripts/tests/docs;
 there are no new host fixtures to review or clean up.

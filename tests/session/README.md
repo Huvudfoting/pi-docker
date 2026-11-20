@@ -13,7 +13,31 @@ Do not repeat completed gates to reconstruct them. No Docker cleanup/prune,
 worktree-metadata repair, staging or commit was performed; no current container
 inventory is claimed. No further cleanup is requested. See `PLAN.md` handoff.
 
-## Current task: automatic server-restart harness implemented; execution approval pending
+## Current task: second ordinary attempt blocked; startup settings audit/fix
+
+The second user-approved fixture `/tmp/pi-docker-restart.FopIIj`
+(`pi-restart-fopiij`) passed ready, opened Pi and reported its seed checkpoint
+saved. Host collection then rejected changed `data/config/settings.json`:
+Pi 1.5.2 added `lastChangelogVersion: "1.5.2"` and reformatted the JSON.
+Preparation now pre-seeds that marker and uses the SDK's exact pretty JSON/no
+final newline format. The user chose this fix plus a startup-write audit before
+another fresh fixture. See the design's audit section and the five new
+`test-restart-settings.mjs` tests using installed SDK code, without a Pi process,
+network, model or live Herdr/Docker. Semantic settings drift still fails hashes.
+Keep BOTH failed fixtures/sessions and the open Pi unchanged; no quit, detach,
+stop, hash refresh or in-place repair. A new host plan needs its own approval.
+
+### Earlier first attempt: onboarding
+
+The user-approved ordinary fixture `/tmp/pi-docker-restart.dyN3HI`
+(`pi-restart-dyn3hi`) reached its initial Herdr shell, but `restart_ready` rejected
+changed immutable `herdr-config/herdr/config.toml`. The supplied file shows
+Herdr added `onboarding = false`, matching pinned 0.9.5 onboarding completion
+code. Preparation now writes that top-level setting before hashing, with exact
+TOML regression assertions for both cases. No Pi seed/stop/restart was reached.
+Keep the failed fixture and its session untouched: no hash refresh, in-place
+repair, retry or cleanup. The user chose the fix and a fresh fixture; its new plan
+needs separate approval. The agent has not run live Herdr/Docker/Pi itself.
 
 The user selected design of the next Phase 3 gate and then continued
 implementation. See
@@ -64,16 +88,28 @@ and commands for review. Sourcing `control/finish.sh` must be the FIRST shell
 command after /quit; no intervening source/echo/diagnostic is permitted.
 
 Local restart-specific tests, including new `test-server-restart-live.mjs`:
-**268 passed** with a separately selected SHA-pinned upstream reporter source
-asset read only as data in synthetic fixtures. Full suite: **308 passed, 1 skipped**
-(jq unavailable). Without that optional asset, ten full-pin simulations skip:
-**298 passed, 11 skipped**. Full public saved-evidence positives here use inert
+**291 passed** with the installed Pi 1.5.2 SDK and a separately selected SHA-pinned upstream reporter source
+asset read only as data in synthetic fixtures. Full suite: **331 passed, 1 skipped**
+(jq unavailable). Without that optional asset, 28 full-pin simulations skip:
+**303 passed, 29 skipped**. Full public saved-evidence positives here use inert
 runtime/installer adapters, not an official host installation or real restart;
 no reporter source is vendored/executed and no live attestation is claimed.
 
-**IMPLEMENTATION FINISHED; NO HOST EXECUTION APPROVED OR RUN.** Next is review
-of a new host-prepared frozen plan, explicit execution approval, and actual host
-runs/evidence review. Do not arm phase files manually or import low-level helpers
+Final static/inert safety review closed approval-to-action gaps: public gates,
+strict ledger and fresh daemon/image/container/absence checks run again after
+approval before entry; seed/input/daemon checks run again before stop; private
+ownership/mode and tool SHA256 are rechecked at mutation boundaries. Eighteen
+prompt-time drift regressions verify rejection before installer/stop/attach.
+These checks do not provide atomic isolation against concurrent same-user edits;
+such edits remain prohibited by the procedure.
+
+The five SDK audit cases skip explicitly if Pi 1.5.2 is not installed; no
+installation is attempted. `PI_RESTART_TEST_PI_ROOT` may select an existing
+1.5.2 package directory (explicit wrong/missing overrides fail).
+
+**IMPLEMENTATION FINISHED; SECOND HOST ATTEMPT BLOCKED AT SEED COLLECTION.** Next is a
+fresh fixture with onboarding/changelog initialization completed before hashing, review of its new plan,
+explicit execution approval, and actual host runs/evidence review. Do not arm phase files manually or import low-level helpers
 to bypass those boundaries. Completed native reopen gates below must not be
 rerun to reconstruct evidence. Phase 3 stays open.
 

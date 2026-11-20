@@ -124,8 +124,7 @@ export class RestartWorkflow {
     this.r = new ArtifactStore(directory); this.f = validatePreparation(this.r); this.op = operation; this.io = io;
     must(this.f.root === this.r.root, 'live execution cannot use a copied/rebased fixture');
     assertHostContext(io.host, this.f, insideCommands.includes(operation));
-    const stat = fs.lstatSync(directory);
-    must(stat.uid === io.host.uid && (stat.mode & 0o777) === 0o700, 'live fixture must be owned by caller and mode 0700');
+    this.checkPrivateRoot();
     must(fs.realpathSync(io.host.entryFile) === `${directory}/control/server-restart-live.mjs`, 'execute the frozen fixture entry, not repository source');
     const frozen = this.r.json('control/host-tools.json');
     must(io.host.node === frozen.node, 'Node interpreter changed');
@@ -142,6 +141,11 @@ export class RestartWorkflow {
     else must(equal(this.selectors, this.savedTools.selectors), 'Docker selectors changed; do not unset/replay context');
     const runner = io.runner ?? new ReadOnlyRunner({ fixture: this.f, tools: this.savedTools.tools, env: this.env });
     this.c = new CollectorCore({ store: this.r, fixture: this.f, ledger: this.l, runner, observations: io.observations, clock: io.clock });
+  }
+  checkPrivateRoot() {
+    const stat = fs.lstatSync(this.r.root);
+    must(stat.isDirectory() && stat.uid === this.io.host.uid && (stat.mode & 0o777) === 0o700,
+      'live fixture must be owned by caller and mode 0700');
   }
   async run(args = {}) {
     try {
@@ -182,9 +186,11 @@ export class RestartWorkflow {
     const f = this.f;
     const answer = await this.io.approve(`DISPOSABLE ONLY: ${phase}\nSession: ${f.session}\nSelection: ${f.selected}\nPrivate state: ${f.sessionDirectory}\nNo default/working session, retry or cleanup is allowed.`, f.session);
     must(answer.answer === f.session && clean(answer.observation), 'human approval invalid');
+    this.checkPrivateRoot();
     return { phase, session: f.session, answer: answer.answer, observation: answer.observation, disposable: true, at: this.io.clock() };
   }
   arm(from, to) {
+    this.checkPrivateRoot();
     must(['seed', 'restored'].includes(to) && (to === 'seed' ? from === 'unarmed' : from === 'seed'), 'unsupported phase transition');
     const files = ['control/phase', 'data/config/phase3-restart-stage'];
     for (const file of files) must(this.r.text(file) === from + '\n', 'phase changed; no repair');
@@ -203,13 +209,13 @@ export class RestartWorkflow {
     this.l.begin('entry-seed'); this.c.preflight();
     must(this.r.absent('data/config/extensions/herdr-agent-state.ts'), 'reporter already exists before official installation');
     this.r.reserve('logs/official-install');
-    validatePreparation(this.r); this.io.checkTools(this.savedTools);
+    this.checkPrivateRoot(); validatePreparation(this.r); this.io.checkTools(this.savedTools);
     const result = this.io.mutate('installer', ['install'], this.env, this.f, this.savedTools.tools);
     this.r.jsonWrite('logs/official-install.json', result); good(result); validateInputs(this.r);
     return this.attach('seed', 4);
   }
   async attach(phase, expectedRows) {
-    validateInputs(this.r);
+    this.checkPrivateRoot(); validateInputs(this.r);
     this.l.expect(phase === 'seed' ? 'entry-seed' : 'entry-restored', true);
     this.io.checkTools(this.savedTools);
     const result = await this.io.attach(this.f, this.savedTools.tools, this.env);
@@ -277,7 +283,7 @@ export class RestartWorkflow {
     must(equal(this.io.observations.socket(`${this.f.sessionDirectory}/herdr.sock`), seed.socket), 'socket changed during stop approval');
     must(this.r.bytes(storage.relative).equals(this.r.bytes('logs/seed.jsonl')) &&
       this.r.bytes(`data/herdr-launches/${storage.key}.record`).equals(this.r.bytes('logs/seed.record')), 'seed changed during stop approval');
-    this.l.begin('stop'); this.r.reserve('logs/named-stop');
+    this.checkPrivateRoot(); this.l.begin('stop'); this.r.reserve('logs/named-stop');
     this.io.checkTools(this.savedTools);
     const result = this.io.mutate('stop', ['session', 'stop', this.f.session], this.env, this.f, this.savedTools.tools);
     this.r.jsonWrite('logs/stop-command.json', result); good(result);

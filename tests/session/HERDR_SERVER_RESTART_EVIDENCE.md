@@ -1,7 +1,17 @@
 # Restart evidence collector contract (test-only, version 1)
 
 Status: the complete guarded workflow, public validators and collector have
-inert tests. **No host execution is authorized or performed.** The finished
+inert tests. **The second ordinary host attempt reached the seed checkpoint but
+collection was blocked by Pi's changelog settings write; no stop/restore was
+reached.** Preserve `/tmp/pi-docker-restart.FopIIj` / `pi-restart-fopiij`, including
+its open Pi, with no quit/detach/stop/repair/hash refresh. Preparation now seeds
+`lastChangelogVersion: "1.5.2"` and exact SDK JSON serialization; installed-SDK
+startup/persistence audit tests retain strict immutable-input checks.
+
+The first attempt was blocked at ready by an onboarding config write. Preserve
+`/tmp/pi-docker-restart.dyN3HI` / `pi-restart-dyn3hi`; no in-place repair, hash
+refresh or cleanup. Preparation now freezes `onboarding = false` initially.
+A fresh fixture requires its own reviewed plan and approval. The finished
 procedure for separate review/approval is
 [HERDR_SERVER_RESTART_RUNBOOK.md](HERDR_SERVER_RESTART_RUNBOOK.md).
 This contract describes saved evidence, not execution permission.
@@ -13,7 +23,8 @@ read-only offline `--inspect`; no live entry/stop/arming commands in that module
 Guarded host workflow: `tests/host/server-restart-live.mjs`; its frozen CLI requires
 `--execute-reviewed-procedure` for every live operation and separate user approval.
 Tests: `test-server-restart-evidence.mjs` and `test-server-restart-control.mjs`
-under `tests/session/`, plus `test-server-restart-live.mjs`.
+under `tests/session/`, plus `test-server-restart-live.mjs` and
+`test-restart-settings.mjs` (installed-SDK initialization/persistence audit).
 No production record, launcher, mount policy or Herdr protocol is changed.
 
 ## Validator entry points and limits
@@ -114,7 +125,9 @@ under `control/host-tools.json`, the guarded entry under
 `control/runbook.md`, and this contract under `control/evidence-contract.md`. `terminalWorkflow` is
 `two_normal_host_terminals`, reflecting the user's procedure-design choice.
 Old unarmed preparation artifacts without them need not be reused or repaired;
-there has been no approved host run of this harness.
+the first approved host attempt was blocked before seed by onboarding, and the
+second reached the reported seed checkpoint but was blocked at collection by Pi
+settings initialization. Neither supplies a runtime continuity result.
 
 ## Controller/collector and guarded workflow
 
@@ -179,6 +192,17 @@ The final public result is retained as `logs/assessment.json`. New dynamic
 artifacts also include `logs/host-tools.json`, `logs/daemon.json`,
 `logs/entry-{seed,restored}-client.json`, `logs/ordinary-prerequisite.json` (linked),
 `logs/ready-shell.stat`, `logs/ready-runtime.json` and `logs/ready-status.json`.
+After human prompts, the live controller repeats the relevant public/strict
+ledger gate before mutation: seed/input/daemon checks before stop, and full
+stopped/input/daemon/context/boot/process/socket/inventory/image checks before
+fresh entry. Pre-install and pre-attach input/tool checks and repeated private
+root ownership/0700 checks block changed inputs or lost directory protection.
+Executable checks compare SHA256 as well as metadata/PATH. Post-prompt daemon
+queries use distinct `stop-approved-*` / `enter-restored-approved-*` logs;
+fresh inventory queries and image observations have separate `approved-` names.
+These are retained observations, not additional execution authority. Checks are
+not atomic against a malicious/concurrent same-user actor; concurrent fixture/
+configuration edits remain out of scope and prohibited.
 No record/profile/reporter is repaired on uncertainty, and no cleanup is supplied.
 
 What remains is host procedure review, explicit execution approval, actual host
@@ -395,12 +419,11 @@ requires exactly stages 1–3, before any restored launch reservation exists.
   unrelated successful command. A human observation is not a substitute for the
   required raw shell/exit/container receipts.
 
-## Remaining implementation gate
+## Remaining host validation gate
 
-Build the separately reviewed controller, including private environment entry,
-version/image/context/Unix-socket-length preflight, official installer, stage
-reservations, actual `/proc` ancestry collection, bounded capture/probes,
-human-only stop approval, fresh re-entry, checkpoint/visual/exit collection and
-inert negative tests. Wire only the public validators into its gates. Then
-present exact host commands and obtain explicit execution approval. No host run,
-server stop or resource cleanup is authorized by this document.
+The guarded controller and public gates are implemented. After the blocked
+onboarding and Pi changelog settings attempts, prepare a fresh fixture using
+both corrected initial configurations,
+review its exact plan and obtain new execution approval. Preserve failed and
+completed evidence; do not repair/re-hash/retry the failed fixture. This document
+itself authorizes no host run, server stop or resource cleanup.

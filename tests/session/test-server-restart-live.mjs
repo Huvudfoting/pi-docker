@@ -264,3 +264,55 @@ for (const fault of ['decline', 'earlyDetach', 'stopTimeout', 'retained', 'image
       assert.throws(() => validateInputs(new EvidenceReader(race.f.root)), /controller failure/);
     }
   });
+
+// Changes happen inside the synthetic human prompt, after the first preflight.
+// These cases must reject BEFORE a new client/server or private installer runs.
+for (const drift of ['frozen-input', 'reporter', 'history', 'record', 'persistence', 'daemon', 'image', 'retained', 'socket', 'boot', 'tools', 'private-mode'])
+  test(`fresh entry refuses prompt-time ${drift} drift before attach`, { skip: !assetPath }, async t => {
+    const s = simulation(t); await s.perform('enter-seed'); await s.perform('stop'); s.setRestored();
+    let prompted = false;
+    s.state.onApproval = message => {
+      assert.match(message, /DISPOSABLE ONLY: restored/); prompted = true;
+      if (drift === 'frozen-input') s.put('herdr-config/herdr/config.toml', '# changed during approval\n');
+      else if (drift === 'reporter') s.put('data/config/extensions/herdr-agent-state.ts', '// changed during approval\n');
+      else if (drift === 'history') fs.appendFileSync(s.f.root + '/' + s.storage.relative, '\n');
+      else if (drift === 'record') s.put(`data/herdr-launches/${s.storage.key}.record`, 'changed\n');
+      else if (drift === 'persistence') fs.appendFileSync(s.f.sessionDirectory + '/session.json', '\n');
+      else if (drift === 'socket') s.state.server = true;
+      else if (drift === 'private-mode') fs.chmodSync(s.f.root, 0o777);
+      else s.state.fault[drift] = true;
+    };
+    await assert.rejects(s.perform('enter-restored')); assert.equal(prompted, true);
+    assert.deepEqual(s.state.clients, ['seed']); assert.equal(s.state.mutations.length, 2);
+    assert.throws(() => validateInputs(new EvidenceReader(s.f.root)), /controller failure/);
+    const queries = s.state.calls.length;
+    await assert.rejects(s.perform('enter-restored'));
+    assert.equal(s.state.calls.length, queries); assert.deepEqual(s.state.clients, ['seed']);
+  });
+for (const drift of ['frozen-input', 'reporter', 'daemon'])
+  test(`stop refuses prompt-time ${drift} drift before mutation`, { skip: !assetPath }, async t => {
+    const s = simulation(t); await s.perform('enter-seed'); let prompted = false;
+    s.state.onApproval = message => {
+      assert.match(message, /DISPOSABLE ONLY: stop/); prompted = true;
+      if (drift === 'frozen-input') s.put('herdr-config/herdr/config.toml', '# changed during approval\n');
+      else if (drift === 'reporter') s.put('data/config/extensions/herdr-agent-state.ts', '// changed during approval\n');
+      else s.state.fault.daemon = true;
+    };
+    await assert.rejects(s.perform('stop')); assert.equal(prompted, true);
+    assert.deepEqual(s.state.mutations.map(m => m[0]), ['installer']);
+    assert.equal(s.state.server, true); // preserve the old disposable server; never silently stop it
+    assert.throws(() => validateInputs(new EvidenceReader(s.f.root)), /controller failure/);
+  });
+for (const drift of ['frozen-input', 'tools', 'private-mode'])
+  test(`initial entry refuses prompt-time ${drift} drift before installer`, { skip: !assetPath }, async t => {
+    const s = simulation(t); let prompted = false;
+    s.state.onApproval = message => {
+      assert.match(message, /DISPOSABLE ONLY: seed/); prompted = true;
+      if (drift === 'frozen-input') s.put('herdr-config/herdr/config.toml', '# changed during approval\n');
+      else if (drift === 'private-mode') fs.chmodSync(s.f.root, 0o777);
+      else s.state.fault.tools = true;
+    };
+    await assert.rejects(s.perform('enter-seed')); assert.equal(prompted, true);
+    assert.deepEqual(s.state.mutations, []); assert.deepEqual(s.state.clients, []);
+    assert.throws(() => validateInputs(new EvidenceReader(s.f.root)), /controller failure/);
+  });

@@ -74,6 +74,15 @@ const r=cp.spawnSync(${JSON.stringify(git)},process.argv.slice(2),{env:process.e
     assert.equal(fs.readFileSync(root + '/data/config/phase3-restart-stage', 'utf8'), 'unarmed\n');
     assert.equal(fs.existsSync(root + '/data/config/extensions/herdr-agent-state.ts'), false);
     assert.equal(fs.existsSync(fixture.sessionDirectory), false);
+    // Regression for host fixture dyN3HI: completing default onboarding prepended
+    // this setting after hashing and correctly blocked ready. Pin it up front,
+    // at the top level (not inside [session] or [terminal]), for BOTH cases.
+    const herdrConfig = fs.readFileSync(root + '/herdr-config/herdr/config.toml', 'utf8');
+    assert.equal(herdrConfig, `onboarding = false\n[session]\nresume_agents_on_restore = true\n[terminal]\ndefault_shell = ${JSON.stringify(root + '/control/shell')}\nshell_mode = "non_login"\n`);
+    const settingsText = fs.readFileSync(root + '/data/config/settings.json', 'utf8');
+    const settings = JSON.parse(settingsText);
+    assert.equal(settings.lastChangelogVersion, '1.5.2');
+    assert.equal(settingsText, JSON.stringify(settings, null, 2)); // actual SDK save format, no trailing newline
     const compose = fs.readFileSync(root + '/compose.yaml', 'utf8');
     for (const expected of ['network_mode: none', 'read_only: true', 'mem_limit: 1g', 'pids_limit: 256'])
       assert.ok(compose.includes(expected));
