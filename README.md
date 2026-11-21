@@ -20,7 +20,7 @@ the host.
 
 ## Quick start
 
-On a Linux host with Docker Engine and Compose, from this repository:
+From this repository, on the host:
 
 ```bash
 ./bin/build          # base image
@@ -34,16 +34,14 @@ pi ~/repos/project
 Inside Pi, use `/login` and `/model`. Model APIs must already be running and
 reachable; this project does not manage model servers.
 
-Without `--image` or `PI_DOCKER_IMAGE`, the launcher prefers local
-`pi-docker:custom`, otherwise `pi-docker:base`. See [usage](docs/USAGE.md#launching)
-for image-selection options. Base includes Pi, Node.js, and
-Herdr/GitHub tooling; custom demonstrates extending it with a toolchain and
-runtime settings, optional extensions, instructions, and a skill.
-See [image customization](docs/CUSTOMIZATION.md#two-images).
+Without `--image` or `PI_DOCKER_IMAGE`, the launcher prefers a local
+`pi-docker:custom` over `pi-docker:base`: the minimal base, and the
+derived image that shows how to extend it. See [usage](docs/USAGE.md#launching)
+and [image customization](docs/CUSTOMIZATION.md#two-images).
 
 **Security:** This is not a hardened sandbox. Containers can write the project
-and read mounted credentials; networking is shared with the host. Eligible
-launches inside Herdr automatically gain control of the whole connected session.
+and read mounted credentials; networking is shared with the host. Launches
+inside a Herdr session gain control of the whole connected session.
 Use `--no-herdr` to disable integration. Read [setup and security](docs/SETUP.md).
 
 ## Guides
@@ -64,7 +62,8 @@ resources in `extensions/` and `skills/`. Builds use only `images/`; containers
 mount allowlisted deployment paths at `/opt/pi-docker`, not the repository root.
 Private state lives in ignored `data/`: **back it up privately; never publish it.**
 
-Run offline checks with Python 3 and Node.js; no live Docker or Herdr is needed:
+Test offline with Python 3 (and Node.js for the adapter tests); no
+Docker or Herdr is needed:
 
 ```bash
 python3 -m unittest discover -s tests -p 'test_*.py'
