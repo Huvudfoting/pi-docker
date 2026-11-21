@@ -1,8 +1,22 @@
-# Pi Docker + Herdr
+<p align="center">
+  <img src="docs/img/pi-docker-herdr-synthwave.svg" width="440" alt="Pi, Docker, and Herdr in synthwave style">
+</p>
 
-Run Pi in disposable Docker containers while keeping projects, configuration,
-credentials, and conversations on the host. Optional Herdr integration adds
-reporting, conversation restore, and helper/peer workflows.
+# Pi + Docker + Herdr
+
+Love Pi in Herdr — spawning new instances in separate panes,
+detaching without stopping work? But also hate a swarm of agents
+running loose on your system with your user privileges?
+
+pi-docker gives each Pi instance its own Docker container. Pi runs
+as you — but only inside the container. Your system is out of reach
+except for the project and the shared configuration you mount in.
+Customize the image to fit your workflow: tools, skills, extensions,
+system prompts.
+
+Runs on any Linux system with Docker Engine and Compose; Herdr
+integration is optional. Pi does not even need to be installed on
+the host.
 
 ## Quick start
 
