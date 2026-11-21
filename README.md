@@ -55,12 +55,14 @@ Use `--no-herdr` to disable integration. Read [setup and security](docs/SETUP.md
 
 Guide commands run on the host from this repository root unless marked otherwise.
 
-## Repository and tests
+## Repository
 
 Host tooling lives in `bin/` and `lib/`, build recipes in `images/`, and shared
 resources in `extensions/` and `skills/`. Builds use only `images/`; containers
 mount allowlisted deployment paths at `/opt/pi-docker`, not the repository root.
 Private state lives in ignored `data/`: **back it up privately; never publish it.**
+
+## Tests
 
 Test offline with Python 3 (and Node.js for the adapter tests); no
 Docker or Herdr is needed:

@@ -14,7 +14,7 @@ For launcher options, see [usage](USAGE.md).
   compatible GNU utilities; it is not the integration target.
 
 Host Pi, Git, Node.js, and Python are not needed for launching. For offline tests,
-see the [repository README](../README.md#repository-and-tests).
+see the [repository README](../README.md#tests).
 
 ## 1. Build Pi
 
