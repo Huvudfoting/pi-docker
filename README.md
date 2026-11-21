@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/img/pi-docker-herdr-synthwave.svg" alt="Pi, Docker, and Herdr in synthwave style">
+  <img src="docs/img/pi-docker-herdr-synthwave.svg" width="440" alt="Pi, Docker, and Herdr in synthwave style">
 </p>
 
 # Pi + Docker + Herdr
