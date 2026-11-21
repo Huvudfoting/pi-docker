@@ -6,8 +6,8 @@ Commands run on the **host from the repository root** unless marked otherwise.
 
 | Image | Dockerfile | Contents |
 |---|---|---|
-| `pi-docker:base` — fallback base | `images/base/Dockerfile` | Node.js, Pi, Herdr CLI/skill, Git/GitHub/SSH, TLS/download support, ripgrep |
-| `pi-docker:custom` — derived example | `images/custom/Dockerfile` | Base + Python/pip/uv, nano, optional extensions, instructions, Python skill |
+| `pi-docker:base` — minimal base | `images/base/Dockerfile` | Node.js, Pi, Herdr CLI/skill, Git/GitHub/SSH, TLS/download support, ripgrep |
+| `pi-docker:custom` — derived example | `images/custom/Dockerfile` | Base + example toolchain and runtime settings, optional extensions, instructions, skill |
 
 ```bash
 ./bin/build
@@ -56,30 +56,26 @@ A separate downstream Dockerfile can use `FROM pi-docker:base` and the same
 entrypoint pattern—no launcher fork. Preserve Pi-argument forwarding,
 `/home/node`, and base integration tools/paths.
 
-### Python and editor tooling
+### Adding tools and runtime settings
 
-Custom copies stable Python 3 from the official Bookworm image, adds runtime
-libraries, and sets `EDITOR`/`VISUAL` to nano. Base has neither Python nor an
-editor default. `python` and `python3` share an interpreter. For the project-local
-uv workflow, see the included `python-development` skill; interpreter downloads
-are disabled. Install persistent global tools in images, not running containers.
+The custom Dockerfile shows the pattern: copy the toolchain from an official
+source image (keeping distro/ABI compatibility), apt-install the runtime
+libraries it needs, and set the tool's environment (`EDITOR`/`VISUAL`,
+download-disabled interpreters, and similar belong here, not in shared
+configuration). Verify the result in the Dockerfile before returning to
+`USER node`. Install persistent global tools in images, not running
+containers.
 
 ## Optional extensions
 
-Custom installs/loads `pi-rewind-hook`, `pi-web-access`, `pi-ask-user`,
-`@specode/pi-subscription-usage`, and `@cad0p/pi-deepinfra-provider` (registers the
-`deepinfra` provider and catalog, so no `models.json` entry). `pi-ask-user` provides
-the `ask_user` tool and emits the managed `herdr:blocked` events while waiting for
-input. They are **not required by Herdr**.
-See [usage-extension authentication](AUTHENTICATION.md#subscription-usage-extension)
-and [DeepInfra authentication](AUTHENTICATION.md#deepinfra-provider-extension).
+Extensions added as in the table above are **not required by Herdr**.
+
 Do not vendor upstream extensions into homemade folders or use runtime
 `pi install` for image-managed packages. Install a package whose `peerDependencies`
 name host-supplied Pi packages with `npm install -g --legacy-peer-deps`; otherwise
 npm bundles a duplicate Pi tree. Review third-party extension source first: it runs
 inside Pi and can read credentials.
 
-The common launcher loads repository-owned `extensions/`; keep its manifest.
 The required Herdr reporter is separate and host-managed; see
 [resource ownership](HERDR_INTEGRATION.md#maintenance-and-diagnostics).
 
@@ -132,9 +128,7 @@ package commands; it is update policy, not a security boundary.
 
 ```bash
 ./bin/build --pull --no-cache
-# If using custom, refresh its moving source images explicitly:
-docker pull python:3-slim-bookworm
-docker pull ghcr.io/astral-sh/uv:latest
+# If using custom, pull its moving source images from its Dockerfile explicitly:
 ./bin/build custom --no-cache
 ```
 

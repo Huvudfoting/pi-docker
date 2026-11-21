@@ -1,34 +1,62 @@
-# Pi Docker + Herdr
+<p align="center">
+  <img src="docs/img/pi-docker-herdr-synthwave.svg" width="440" alt="Pi, Docker, and Herdr in synthwave style">
+</p>
 
-Run Pi in disposable Docker containers while keeping projects, configuration,
-credentials, and conversations on the host. Optional Herdr integration adds
-reporting, conversation restore, and helper/peer workflows.
+# Pi + Docker + Herdr
+
+Love Pi in Herdr — spawning new instances in separate panes,
+detaching without stopping work? But also hate a swarm of agents
+running loose on your system with your user privileges?
+
+pi-docker gives each Pi instance its own Docker container. Pi runs
+as you — but only inside the container. Your system is out of reach
+except for the project and the shared configuration you mount in.
+Customize the image to fit your workflow: tools, skills, extensions,
+system prompts.
+
+Runs on any Linux system with Docker Engine and Compose; Herdr
+integration is optional. Pi does not even need to be installed on
+the host.
 
 ## Quick start
 
-On a Linux host with Docker Engine and Compose, from this repository:
+From this repository, on the host:
 
 ```bash
+# Build docker-pi image
 ./bin/build          # base image
-# ./bin/build custom # optional development image; requires base
+./bin/build custom   # your optional custom image; requires base
+
+# Create symlink (ensure ~/.local/bin is on PATH)
 mkdir -p ~/.local/bin
 ln -sfn "$(pwd)/bin/pi" ~/.local/bin/pi
-# Ensure ~/.local/bin is on PATH, then choose an existing project:
+
+# Then start sandboxed Pi
 pi ~/repos/project
 ```
 
-Inside Pi, use `/login` and `/model`. Model APIs must already be running and
-reachable; this project does not manage model servers.
+Inside Pi, use `/login` and `/model`.
 
-Without `--image` or `PI_DOCKER_IMAGE`, the launcher prefers local
-`pi-docker:custom`, otherwise `pi-docker:base`. See [usage](docs/USAGE.md#launching)
-for image-selection options. Base includes Pi, Node.js, and
-Herdr/GitHub tooling; custom adds Python, uv, nano, and optional extensions.
-See [image customization](docs/CUSTOMIZATION.md#two-images).
+Without `--image` or `PI_DOCKER_IMAGE`, the launcher prefers a local
+`pi-docker:custom` over `pi-docker:base`: the minimal base, and the
+derived image that shows how to extend it. See [usage](docs/USAGE.md#launching)
+and [image customization](docs/CUSTOMIZATION.md#two-images).
 
-**Security:** This is not a hardened sandbox. Containers can write the project
-and read mounted credentials; networking is shared with the host. Eligible
-launches inside Herdr automatically gain control of the whole connected session.
+### Use in Herdr
+
+Launch `pi` from inside a Herdr pane and it wires itself in: the
+container reports its status, and conversations come back after an
+interruption through native restore.
+
+Swarm responsibly: ask Pi “Split right and start a Docker-Pi helper
+named reviewer” and it opens a sibling pane with its own container,
+ready for the work you delegate. See
+[Herdr](docs/HERDR_INTEGRATION.md) for modes and restore.
+
+### Security 
+This is not a hardened sandbox. Containers can write the project
+and read mounted credentials; networking is shared with the host. Launches
+inside a Herdr session gain control of the whole connected session.
 Use `--no-herdr` to disable integration. Read [setup and security](docs/SETUP.md).
 
 ## Guides
@@ -42,14 +70,17 @@ Use `--no-herdr` to disable integration. Read [setup and security](docs/SETUP.md
 
 Guide commands run on the host from this repository root unless marked otherwise.
 
-## Repository and tests
+## Repository
 
 Host tooling lives in `bin/` and `lib/`, build recipes in `images/`, and shared
 resources in `extensions/` and `skills/`. Builds use only `images/`; containers
 mount allowlisted deployment paths at `/opt/pi-docker`, not the repository root.
 Private state lives in ignored `data/`: **back it up privately; never publish it.**
 
-Run offline checks with Python 3 and Node.js; no live Docker or Herdr is needed:
+## Tests
+
+Test offline with Python 3 (and Node.js for the adapter tests); no
+Docker or Herdr is needed:
 
 ```bash
 python3 -m unittest discover -s tests -p 'test_*.py'
