@@ -23,11 +23,15 @@ the host.
 From this repository, on the host:
 
 ```bash
+# Build docker-pi image
 ./bin/build          # base image
-# ./bin/build custom # your optional custom image; requires base
+./bin/build custom   # your optional custom image; requires base
+
+# Create symlink (ensure ~/.local/bin is on PATH)
 mkdir -p ~/.local/bin
 ln -sfn "$(pwd)/bin/pi" ~/.local/bin/pi
-# Ensure ~/.local/bin is on PATH, then choose an existing project:
+
+# Then start sandboxed Pi
 pi ~/repos/project
 ```
 
@@ -49,7 +53,8 @@ named reviewer” and it opens a sibling pane with its own container,
 ready for the work you delegate. See
 [Herdr](docs/HERDR_INTEGRATION.md) for modes and restore.
 
-**Security:** This is not a hardened sandbox. Containers can write the project
+### Security 
+This is not a hardened sandbox. Containers can write the project
 and read mounted credentials; networking is shared with the host. Launches
 inside a Herdr session gain control of the whole connected session.
 Use `--no-herdr` to disable integration. Read [setup and security](docs/SETUP.md).
