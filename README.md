@@ -38,6 +38,17 @@ Without `--image` or `PI_DOCKER_IMAGE`, the launcher prefers a local
 derived image that shows how to extend it. See [usage](docs/USAGE.md#launching)
 and [image customization](docs/CUSTOMIZATION.md#two-images).
 
+### Use in Herdr
+
+Launch `pi` from inside a Herdr pane and it wires itself in: the
+container reports its status, and conversations come back after an
+interruption through native restore.
+
+Swarm responsibly: ask Pi “Split right and start a Docker-Pi helper
+named reviewer” and it opens a sibling pane with its own container,
+ready for the work you delegate. See
+[Herdr](docs/HERDR_INTEGRATION.md) for modes and restore.
+
 **Security:** This is not a hardened sandbox. Containers can write the project
 and read mounted credentials; networking is shared with the host. Launches
 inside a Herdr session gain control of the whole connected session.
