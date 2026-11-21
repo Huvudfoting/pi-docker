@@ -24,7 +24,7 @@ From this repository, on the host:
 
 ```bash
 ./bin/build          # base image
-# ./bin/build custom # optional development image; requires base
+# ./bin/build custom # your optional custom image; requires base
 mkdir -p ~/.local/bin
 ln -sfn "$(pwd)/bin/pi" ~/.local/bin/pi
 # Ensure ~/.local/bin is on PATH, then choose an existing project:
