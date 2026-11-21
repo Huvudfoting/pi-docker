@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/img/pi-docker-herdr-synthwave.svg" width="440" alt="Pi, Docker, and Herdr in synthwave style">
+  <img src="docs/img/pi-docker-herdr-synthwave.svg" alt="Pi, Docker, and Herdr in synthwave style">
 </p>
 
 # Pi + Docker + Herdr
@@ -31,8 +31,7 @@ ln -sfn "$(pwd)/bin/pi" ~/.local/bin/pi
 pi ~/repos/project
 ```
 
-Inside Pi, use `/login` and `/model`. Model APIs must already be running and
-reachable; this project does not manage model servers.
+Inside Pi, use `/login` and `/model`.
 
 Without `--image` or `PI_DOCKER_IMAGE`, the launcher prefers a local
 `pi-docker:custom` over `pi-docker:base`: the minimal base, and the
