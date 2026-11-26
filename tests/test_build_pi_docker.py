@@ -65,7 +65,7 @@ class BuildPiDockerTest(unittest.TestCase):
 
     def test_image_pins_versions_and_rejects_empty_herdr_version(self):
         dockerfile = (SOURCE / 'images/base/Dockerfile').read_text()
-        self.assertIn('ARG PI_VERSION=1.6.0\n', dockerfile)
+        self.assertIn('ARG PI_VERSION=1.6.1\n', dockerfile)
         self.assertIn('ARG HERDR_VERSION=0.9.5\n', dockerfile)
         self.assertIn('npm install -g "@earendil-works/pi-coding-agent@${PI_VERSION}"', dockerfile)
         block = next(block for block in dockerfile.split('\n\n') if 'herdr --skill >' in block)

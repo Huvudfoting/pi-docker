@@ -37,7 +37,7 @@ class CustomImageTest(unittest.TestCase):
 
     def test_reviewed_base_versions(self):
         base = (IMAGES / 'base/Dockerfile').read_text()
-        self.assertIn('ARG PI_VERSION=1.6.0', base)
+        self.assertIn('ARG PI_VERSION=1.6.1', base)
         self.assertIn('ARG HERDR_VERSION=0.9.5', base)
 
     def test_self_update_guard_is_image_owned_inherited_and_refuses_updates(self):
